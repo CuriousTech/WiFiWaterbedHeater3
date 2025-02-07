@@ -4,8 +4,11 @@
 #include "Lights.h"
 #include "Display.h"
 #include "uriString.h"
+#include <WiFi.h>
 
 extern Display display;
+
+extern void WsSend(String s);
 
 Lights::Lights()
 {
@@ -19,10 +22,54 @@ void Lights::init()
 {
   m_bQuery = true;
   IPAddress ip(ee.lights[0].ip);
-  send(ip, 80, "/mdns");
+  callQueue(ip, 80, "/mdns");
 }
 
-bool Lights::setSwitch(char *pName, int8_t bPwr, uint8_t nLevel)
+void Lights::service()
+{
+  checkQueue();
+}
+
+void Lights::checkQueue()
+{
+  if (WiFi.status() != WL_CONNECTED)
+    return;
+
+  if (qIdxOut == qIdxIn || queue[qIdxOut].port == 0) // Nothing to do
+    return;
+
+  if(m_status == LI_Busy)
+    return;
+
+  if ( send(queue[qIdxOut].ip, queue[qIdxOut].port, queue[qIdxOut].sUri.c_str()) )
+  {
+    queue[qIdxOut].port = 0;
+    if (++qIdxOut >= CQ_CNT)
+      qIdxOut = 0;
+  }
+}
+
+void Lights::clearQueue()
+{
+  memset(queue, 0, sizeof(queue));
+  qIdxIn = 0;
+  qIdxOut = 0;
+}
+
+void Lights::callQueue(IPAddress ip, uint16_t port, String sUri )
+{
+  if (queue[qIdxIn].port == 0)
+  {
+    queue[qIdxIn].ip = ip;
+    queue[qIdxIn].sUri = sUri;
+    queue[qIdxIn].port = port;
+  }
+
+  if (++qIdxIn >= CQ_CNT)
+    qIdxIn = 0;
+}
+
+void Lights::setSwitch(char *pName, int8_t bPwr, uint8_t nLevel)
 {
   uint8_t nLight = m_nSwitch; // last if no name
 
@@ -31,20 +78,17 @@ bool Lights::setSwitch(char *pName, int8_t bPwr, uint8_t nLevel)
       if(!strcmp((const char *)pName, (const char *)ee.lights[nLight].szName))
         break;
 
-  if(nLight >= EE_LIGHT_CNT-1)
-    return false;
+  if(nLight >= EE_LIGHT_CNT-1 || ee.lights[nLight].ip[0] == 0) // no IP
+    return;
   
   m_bQuery = false;
-
-  if(ee.lights[nLight].ip[0] == 0) // no IP
-    return false;
 
   m_nSwitch = nLight; // for response
   IPAddress ip(ee.lights[nLight].ip);
 
   uriString uri("/wifi");
   uri.Param("key", ee.iotPassword);
-  if(bPwr == -1)
+  if(bPwr == -1) // toggle
     uri.Param("pwr0", !m_bOn[nLight][0]);
   else
     uri.Param("pwr0", bPwr);
@@ -53,15 +97,7 @@ bool Lights::setSwitch(char *pName, int8_t bPwr, uint8_t nLevel)
   {
     uri.Param("level0", nLevel << 1); // dimmers are 1-200
   }
-
-  if(send(ip, 80, uri.string().c_str()) )
-  {
-    m_bOn[nLight][0] = bPwr;
-    if(nLevel)
-      m_nLevel[nLight] = nLevel; // valid level is 1-200
-    return true;
-  }
-  return false;
+  callQueue(ip, 80, uri.string());
 }
 
 bool Lights::getSwitch(uint8_t n)
@@ -109,6 +145,7 @@ void Lights::_onConnect(AsyncClient* client)
 {
   if(m_pBuffer == NULL)
     return;
+
   String path = "GET ";
   path += m_pBuffer;
   path += " HTTP/1.1\n"
@@ -182,7 +219,7 @@ void Lights::_onDisconnect(AsyncClient* client)
 void Lights::callback(int8_t iName, char *pName, int32_t iValue, char *psValue)
 {
   String s;
-  
+
   switch(iName)
   {
     case -1: // wildcard
