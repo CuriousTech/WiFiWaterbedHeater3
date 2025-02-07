@@ -22,7 +22,7 @@ SOFTWARE.
 */
 
 // Build with Arduino IDE 1.8.57.0
-//  ESP32: (2.0.14) ESP32S3 Dev Module, QIO, CPU Freq: 240MHz for mp3 playback,
+//  ESP32: (2.0.14) ESP32S3 Dev Module, QIO, CPU Freq: 240MHz for mp3 playback
 //  Flash: 16MB
 //  Partition: 8M with SPIFFS or 16 MB with FatFS (change INTERNAL_FS in Media.h to match)
 //  PSRAM: QPI PSRAM
@@ -389,7 +389,10 @@ void onUploadSD(AsyncWebServerRequest *request, String filename, size_t index, u
   }
   F.write((byte*)data, len);
   if(final)
+  {
     F.close();
+    media.setDirty();
+  }
 }
 
 void startWiFi()
@@ -570,8 +573,8 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
     case WS_EVT_CONNECT:      //client connected
       client->text( setupJson() );
       client->text( dataJson() );
-      client->text( media.fileListJson(true) );
-      client->text( media.fileListJson(false) );
+      client->text( media.internalFileListJson() );
+      client->text( media.sdFileListJson() );
       client->text( ta.get() );
       display.m_nWsConnected++;
       WsClientID = client->id();
@@ -609,11 +612,11 @@ void setup()
   display.init(); // start display
   wb.init(); // start WB
   ths.init(); // Start temp sensor
-  media.init();
   startWiFi();
 #ifdef RADAR_H
   radar.init();
 #endif
+  media.init();
 }
 
 void loop()
@@ -624,6 +627,8 @@ void loop()
 
   display.service();  // check for touch, etc.
   media.service();
+  lights.service();
+
 #ifdef RADAR_H
   radar.service();
 #endif
