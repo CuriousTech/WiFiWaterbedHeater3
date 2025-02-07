@@ -17,6 +17,7 @@ WB::WB()
 void WB::init()
 {
   pinMode(HEAT, OUTPUT);
+  setHeat(); // Make sure it's off
 
   ds.begin(DS18B20);
   if( ds.search(ds_addr) )
@@ -280,6 +281,7 @@ void WB::service() //  1 second
     if (nCoolETA)
       nCoolETA--;
 
+#ifdef RADAR_H
     static uint8_t lastState;
     if( ((radar.m_bInBed<<1) | radar.m_bPresence) != lastState)
     {
@@ -287,6 +289,7 @@ void WB::service() //  1 second
       if(lastState == 1) // log out of bed change
         ta.add();
     }
+#endif
   }
 }
 
