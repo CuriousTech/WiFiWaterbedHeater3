@@ -3,6 +3,7 @@
 #define MEDIA_H
 
 #include <Arduino.h>
+#include "Display.h"
 #include <cstring>
 #include "FS.h"
 #include "SD_MMC.h"
@@ -29,9 +30,11 @@ enum _sounds
   SND_ALERT,
 };
 
+#define maxPathLength 100
+
 struct FileEntry
 {
-  char Name[100];
+  char Name[maxPathLength];
   uint32_t Size;
   time_t Date;
 };
@@ -43,6 +46,7 @@ public:
   void init(void);
   void service(void);
 
+  void fillFileBButtons(Tile& pTile);
   void Sound(uint8_t n);
   void setVolume(uint8_t volume);
   void Play(const char* directory, const char* fileName);
@@ -51,12 +55,13 @@ public:
   uint32_t Music_Duration(void);
   uint32_t Music_Elapsed(void);
   uint16_t Music_Energy(void);
-  String fileListJson(bool bInternal);
+  String internalFileListJson(void);
+  String sdFileListJson(void);
   void deleteIFile(char *pszFilename);
   void deleteSDFile(char *pszFilename);
+  void setDirty(void);
 
   bool m_bCardIn;
-  bool m_bCardInit;
   bool m_bPlaying;
   uint8_t m_volume = 100;
 
@@ -64,6 +69,7 @@ private:
   uint16_t Folder_retrieval(fs::FS &fs, const char* directory, FileEntry list[],uint16_t maxFiles);
   void Audio_Init(void);
 
+  bool m_bDirty;
 #define FILELIST_CNT 32
   FileEntry SDList[FILELIST_CNT];
   FileEntry InternalList[FILELIST_CNT];
