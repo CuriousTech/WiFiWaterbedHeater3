@@ -706,6 +706,12 @@ void Display::drawTile(int8_t nTile, bool bFirst, int16_t x, int16_t y)
   sprite.setTextDatum(MC_DATUM);
   sprite.setFreeFont(&FreeSans9pt7b);
 
+  if(bFirst && !strcmp(pTile.pszTitle, "Music")) // fill in the mp3 list
+  {
+    media.fillFileBButtons(pTile);
+    formatButtons(pTile);
+  }
+
   uint8_t btnCnt;
   for( btnCnt = 0; btnCnt < BUTTON_CNT && pTile.button[btnCnt].row != 0xFF; btnCnt++); // count buttons
 
@@ -953,8 +959,7 @@ void Display::buttonCmd(Button *pBtn, bool bRepeat)
       break;
 
     case BTF_Lights:
-      if(!lights.setSwitch((char *)pBtn->pszText, -1, 0 ) )
-        toast("Light command failed");
+      lights.setSwitch((char *)pBtn->pszText, -1, 0 );
       break;
 
     case BTF_Restart:
@@ -1179,3 +1184,4 @@ void Display::RingIndicator(uint8_t n)
 
   tft.drawWideLine(pos, 5, pos + 20, 5, 4, TFT_RED, bgColor);
 }
+            
