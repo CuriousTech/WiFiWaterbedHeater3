@@ -1,5 +1,4 @@
 #include "Media.h"
-#include "Display.h"
 #include "eeMem.h"
 #include "jsonString.h"
 
@@ -11,7 +10,40 @@ Media::Media()
 
 void Media::service()
 {
+  static File Path;
+  static File file;
+  static uint16_t fileCount;
+
   audio.loop();
+
+  // async dir list because this can take a while
+  if(m_bCardIn)
+  {
+    if(m_bDirty)
+    {
+      m_bDirty = false;
+      Path = SD_MMC.open("/");
+      file = Path.openNextFile();
+      fileCount = 0;
+    }
+  
+    if(Path && file)
+    {
+      if (!file.isDirectory())
+      {
+        strncpy(SDList[fileCount].Name, file.name(), maxPathLength - 1);
+        SDList[fileCount].Size = file.size();
+        SDList[fileCount].Date = file.getLastWrite();
+        fileCount++;
+      }
+      file = Path.openNextFile();
+      if(!file || fileCount >= FILELIST_CNT - 1 )
+      {
+        file.close();
+        Path.close();
+      }
+    }
+  }
 }
 
 void Media::init()
@@ -25,13 +57,8 @@ void Media::init()
   digitalWrite(SD_D3_PIN, HIGH); //enable
   vTaskDelay(pdMS_TO_TICKS(10));
 
-  if (SD_MMC.begin("/sdcard", true, true) == false)
+  if (SD_MMC.begin("/sdcard", true, true) )
   {
-//    ets_printf("SD card failed\r\n");
-  }
-  else
-  {
-    m_bCardInit = true;
     uint8_t cardType = SD_MMC.cardType();
   
     if(cardType == CARD_NONE || cardType == CARD_UNKNOWN)
@@ -40,42 +67,30 @@ void Media::init()
       return;
     }
     m_bCardIn = true;
-    Folder_retrieval(SD_MMC, "/", SDList, 30);
   }
 
   if(INTERNAL_FS.begin(true))
   {
-    Folder_retrieval(INTERNAL_FS, "/", InternalList, 30);
+    Folder_retrieval(INTERNAL_FS, "/", InternalList, FILELIST_CNT - 2);
   }
 
-  // Find Music tile
-  uint8_t nLi = 0;
-  while(display.m_tile[nLi].pszTitle || display.m_tile[nLi].Extras )
+  setDirty();
+}
+
+void Media::fillFileBButtons(Tile& pTile)
+{
+  uint8_t i;
+
+  for(i = 0; i < BUTTON_CNT - 2 && SDList[i].Name[0]; i++)
   {
-    if( !strcmp(display.m_tile[nLi].pszTitle, "Music") )
-      break;
-    nLi++;
+    pTile.button[i+1].pszText = SDList[i].Name;
+    pTile.button[i+1].row = i;
+    pTile.button[i+1].r.w = 260;
+    pTile.button[i+1].r.h = 20;
+    pTile.button[i+1].nFunction = BTF_TrackBtn;
   }
 
-  Tile& pTile = display.m_tile[nLi];
-
-  if(pTile.Extras)
-  {
-    uint8_t i;
-
-    for(i = 0; i < BUTTON_CNT - 2 && SDList[i].Name[0]; i++)
-    {
-      pTile.button[i+1].pszText = SDList[i].Name;
-      pTile.button[i+1].row = i;
-      pTile.button[i+1].r.w = 260;
-      pTile.button[i+1].r.h = 20;
-      pTile.button[i+1].nFunction = BTF_TrackBtn;
-    }
-
-    pTile.button[i].row = 0xFF; // end row
-  }
-
-  display.formatButtons(pTile);
+  pTile.button[i].row = 0xFF; // end row
 }
 
 uint16_t Media::Folder_retrieval(fs::FS &fs, const char* directory, FileEntry list[], uint16_t maxFiles)
@@ -94,35 +109,42 @@ uint16_t Media::Folder_retrieval(fs::FS &fs, const char* directory, FileEntry li
   {
     if (!file.isDirectory())
     {
-      strncpy(list[fileCount].Name, file.name(), sizeof(list[0].Name));
+      strncpy(list[fileCount].Name, file.name(), maxPathLength - 1);
       list[fileCount].Size = file.size();
       list[fileCount].Date = file.getLastWrite();
       fileCount++;
     }
-    file = Path.openNextFile();                                      
+    file = Path.openNextFile();
   }
   Path.close();                                                         
   return fileCount;                                                 
 }
 
-String Media::fileListJson(bool bInternal)
+String Media::internalFileListJson()
 {
   // refresh the list before sending
-  if(bInternal)
-  {
-    memset(InternalList, 0, sizeof(InternalList));
-    Folder_retrieval(INTERNAL_FS, "/", InternalList, FILELIST_CNT-1);
-  }
-  else
+  memset(InternalList, 0, sizeof(InternalList));
+  Folder_retrieval(INTERNAL_FS, "/", InternalList, FILELIST_CNT-1);
+
+  jsonString js("files");
+  js.Array("list", InternalList);
+  return js.Close();
+}
+
+String Media::sdFileListJson()
+{
+  if(m_bDirty)
   {
     memset(SDList, 0, sizeof(SDList)); // warning: use same sizes
     Folder_retrieval(SD_MMC, "/", SDList, FILELIST_CNT-1);
+    m_bDirty = false;
   }
 
-  jsonString js(bInternal ? "files" : "filesSD");
-  js.Array("list", bInternal ? InternalList : SDList );
+  jsonString js("filesSD");
+  js.Array("list", SDList );
   return js.Close();
 }
+
 
 void Media::deleteIFile(char *pszFilename)
 {
@@ -136,6 +158,12 @@ void Media::deleteSDFile(char *pszFilename)
   String sRemoveFile = "/";
   sRemoveFile += pszFilename;
   SD_MMC.remove(sRemoveFile);
+  m_bDirty = true;
+}
+
+void Media::setDirty()
+{
+  m_bDirty = true;
 }
 
 void Media::Audio_Init()
@@ -150,7 +178,7 @@ void Media::setVolume(uint8_t volume)
   if(volume > Volume_MAX )
     return;
   m_volume = volume;
-  audio.setVolume(volume * 21 / 100); // 0...21    
+  audio.setVolume(volume * 21 / 100); // 0...21
 }
 
 const char *pSounds[] = {
@@ -185,11 +213,12 @@ void Media::Play(const char* directory, const char* fileName)
   if(fileName == pLast && audio.isRunning())
   {
     audio.pauseResume();
+    pLast = NULL;
+    return;
   }
   pLast = fileName;
 
   // SD Card
-  const int maxPathLength = 100;
   char filePath[maxPathLength];
   if(!strcmp(directory, "/"))
     snprintf(filePath, maxPathLength, "%s%s", directory, fileName);   
