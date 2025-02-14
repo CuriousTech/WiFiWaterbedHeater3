@@ -563,8 +563,8 @@ void Display::oneSec()
         for(i = 0; i < BUTTON_CNT - 2 && ee.lights[i].szName[0]; i++)
         {
           pTile.button[i+1].pszText = ee.lights[i].szName;
-          pTile.button[i+1].row = i;
-          pTile.button[i+1].r.w = 140;
+          pTile.button[i+1].row = i >> 1; // 2 per row
+          pTile.button[i+1].r.w = 100;
           pTile.button[i+1].r.h = 28;
           pTile.button[i+1].nFunction = BTF_Lights;
         }
@@ -797,7 +797,7 @@ void Display::drawButton(Tile& pTile, Button *pBtn, bool bPressed, int16_t x, in
       s = String((float)m_outTemp/10, 1);
       break;
     case BTF_Lights:
-      if(lights.getSwitch(pBtn->row)) // light is on
+      if(lights.getSwitch(pBtn->pszText)) // light is on
         pBtn->flags |= BF_STATE_2;
       else
         pBtn->flags &= ~BF_STATE_2;
@@ -1010,6 +1010,10 @@ void Display::Notify(char *pszNote, IPAddress ip)
   m_notifyIp = ip; // used for remote cancel
   m_brightness = ee.brightLevel;
 
+  for(int8_t i = NOTE_CNT - 2; i >= 0; i--) // move old notifications down
+    m_pszNotifs[i+1] = m_pszNotifs[i];
+  m_pszNotifs[0] = pszNote;
+
   if(popup.created())
   {
     popup.deleteSprite();
@@ -1029,21 +1033,25 @@ void Display::Notify(char *pszNote, IPAddress ip)
   popup.fillSprite(bgColor);
   popup.fillRect(1, 1, m_popupWidth-3, m_popupHeight-3, TFT_DARKGREY);
 
+  String s = pszNote;
   uint8_t y = 5;
-  char *p = pszNote;
-  char *pstr;
-  while((pstr = strtok_r(p, "\n", &p)) != NULL)
+  int16_t nxt = 0;
+  int16_t idx;
+
+  while((idx = s.indexOf('\n', nxt)) != -1)
   {
-    popup.drawString(pstr, 4, y);
+    popup.drawString(s.substring(nxt, idx), 4, y);
+    nxt = idx + 1;
     y += 14;
   }
+  popup.drawString(s.substring(nxt), 4, y);
 
   popup.drawSmoothRoundRect(0, 0, 3, 3, m_popupWidth-1, m_popupHeight-1, TFT_CYAN, bgColor);
 
   popup.pushSprite( m_popupLeft, m_popupTop);
   m_bPopupActive = true;
 
-//  media.Sound(SND_ALERT);
+  media.Sound(SND_ALERT);
 }
 
 void Display::NotificationCancel(IPAddress ip) // cancel a remote popup
@@ -1053,6 +1061,12 @@ void Display::NotificationCancel(IPAddress ip) // cancel a remote popup
     m_bPopupActive = false;
     updateTile();
   }
+}
+
+void Display::checkNotif()
+{
+  if(m_bPopupActive) // make a sound when popup is active (mostly radar, when someone enters the room)
+    media.Sound(SND_ALERT);
 }
 
 // draw the notifs list
@@ -1184,4 +1198,3 @@ void Display::RingIndicator(uint8_t n)
 
   tft.drawWideLine(pos, 5, pos + 20, 5, 4, TFT_RED, bgColor);
 }
-            
