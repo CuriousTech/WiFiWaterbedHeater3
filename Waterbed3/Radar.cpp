@@ -39,7 +39,7 @@ void Radar::service()
 {
   if(radarConnected == false)
     return;
-  
+
   static bool bLastPres;
   m_bPresence = read();
 
@@ -54,6 +54,7 @@ void Radar::service()
         lights.setSwitch("Dresser", 1, 0);
         lights.setSwitch("Headboard", 1, 0);
         m_bLightOn = true;
+        display.checkNotif();
       }
     }
     sendState();
@@ -125,13 +126,13 @@ bool Radar::read()
   {
     if(nNewZone != 2)
     {
-      String s = "R";
+/*      String s = "R";
       for(uint8_t i = 0; i < 16; i++)
       {
         s += " ";
         s += rads[i];
       }
-      WsSend(s);
+      WsSend(s);*/
       nZoneCnt = 0;
     }
     nNewZone = 2;
@@ -168,10 +169,10 @@ bool Radar::read()
       m_bInBed = true;
       if(m_bLightOn)
       {
-//        clearQueue();
+        lights.clearQueue();
         lights.setSwitch("Dresser", 0, 0);
         lights.setSwitch("Headboard", 0, 0);
-        lights.setSwitch("BRFane", 1, 0);
+        lights.setSwitch("BRFan", 1, 0);
         m_bLightOn = false;
       }
       break;
@@ -182,7 +183,7 @@ bool Radar::read()
       {
         display.m_backlightTimer = ee.sleepTime; // reset timer for any touch
         display.m_brightness = ee.brightLevel;
-//        clearQueue();
+        lights.clearQueue();
         lights.setSwitch("Dresser", 1, 0);
         lights.setSwitch("Headboard", 1, 0);
         lights.setSwitch("BRFan", 0, 0);
@@ -194,11 +195,11 @@ bool Radar::read()
       m_bInBed = false;
       if(m_bLightOn)
       {
-//        clearQueue();
+        lights.clearQueue();
         lights.setSwitch("Dresser", 0, 0);
         lights.setSwitch("Headboard", 0, 0);
-        m_bLightOn = false;
         lights.setSwitch("BRFan", 0, 0);
+        m_bLightOn = false;
       }
       break;
   }
