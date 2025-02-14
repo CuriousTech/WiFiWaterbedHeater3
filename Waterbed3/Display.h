@@ -112,6 +112,7 @@ public:
   void setSliderValue(uint8_t st, int8_t iValue);
   void RingIndicator(uint8_t n);
   void updateTile(void);
+  void checkNotif(void);
 
 private:
   void swipeCheck(int16_t dX, int16_t dY);
