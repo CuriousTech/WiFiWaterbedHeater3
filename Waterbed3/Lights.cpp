@@ -100,9 +100,19 @@ void Lights::setSwitch(char *pName, int8_t bPwr, uint8_t nLevel)
   callQueue(ip, 80, uri.string());
 }
 
-bool Lights::getSwitch(uint8_t n)
+bool Lights::getSwitch(const char *pName)
 {
-  return m_bOn[n][0];
+  uint8_t nLight = m_nSwitch; // last if no name
+
+  if(pName)
+    for(nLight = 0; ee.lights[nLight].szName[0] && nLight < EE_LIGHT_CNT; nLight++)
+      if(!strcmp(pName, (const char *)ee.lights[nLight].szName))
+        break;
+
+  if(nLight >= EE_LIGHT_CNT-1 || ee.lights[nLight].ip[0] == 0) // no IP
+    return false;
+
+  return m_bOn[nLight][0];
 }
 
 bool Lights::send(IPAddress serverIP, uint16_t port, const char *pURI)
