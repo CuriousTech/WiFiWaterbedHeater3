@@ -46,6 +46,7 @@ public:
   void init(void);
   void service(void);
 
+  uint32_t SDcardFreeK(void);
   void fillFileBButtons(Tile& pTile);
   void Sound(uint8_t n);
   void setVolume(uint8_t volume);
@@ -61,7 +62,6 @@ public:
   void deleteSDFile(char *pszFilename);
   void setDirty(void);
 
-  bool m_bCardIn;
   bool m_bPlaying;
   uint8_t m_volume = 100;
 
@@ -69,6 +69,7 @@ private:
   uint16_t Folder_retrieval(fs::FS &fs, const char* directory, FileEntry list[],uint16_t maxFiles);
   void Audio_Init(void);
 
+  bool m_bCardIn;
   bool m_bDirty;
 #define FILELIST_CNT 32
   FileEntry SDList[FILELIST_CNT];
