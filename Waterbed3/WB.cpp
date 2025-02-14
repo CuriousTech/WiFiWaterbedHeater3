@@ -4,7 +4,6 @@
 #include "eeMem.h"
 #include "RunningMedian.h"
 #include "TempArray.h"
-#include "Radar.h"
 
 //#define SDEBUG
 
@@ -88,9 +87,8 @@ void WB::service() //  1 second
   {
     m_bHeater = false;
     setHeat();
-    static String s = "WARNING\nDS18 not detected";
     consolePrint("DS18 not present");
-    display.Notify((char *)s.c_str(), ip);
+    display.Notify("WARNING\nDS18 not detected", ip);
     return;
   }
 
