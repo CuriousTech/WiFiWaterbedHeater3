@@ -4,6 +4,8 @@
 #include <Arduino.h>
 #include <OneWire.h>
 
+#include "Radar.h" // comment this line to remove radar
+
 #define HEAT 18
 #define DS18B20 15
 
