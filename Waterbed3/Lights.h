@@ -31,8 +31,9 @@ public:
   void init(void);
   void service(void);
   void setSwitch(char *pName, int8_t bPwr, uint8_t nLevel);
-  bool getSwitch(uint8_t n);
+  bool getSwitch(const char *pName);
   int checkStatus();
+  void clearQueue(void);
 
 private:
   bool send(IPAddress serverIP, uint16_t port, const char *pURI);
@@ -44,7 +45,6 @@ private:
   void callback(int8_t iName, char *pName, int32_t iValue, char *psValue);
   void checkQueue(void);
   void callQueue(IPAddress ip, uint16_t port, String sUri);
-  void clearQueue(void);
 
   AsyncClient m_ac;
   char *m_pBuffer = NULL;
