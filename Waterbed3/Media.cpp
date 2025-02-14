@@ -16,7 +16,7 @@ void Media::service()
 
   audio.loop();
 
-  // async dir list because this can take a while
+  // non-blocking dir list because this can take a while
   if(m_bCardIn)
   {
     if(m_bDirty)
@@ -77,9 +77,21 @@ void Media::init()
   setDirty();
 }
 
+uint32_t Media::SDcardFreeK()
+{
+  if(!m_bCardIn)
+    return 0;
+
+  return (SD_MMC.totalBytes() - SD_MMC.usedBytes()) / 1024;
+}
+
+
 void Media::fillFileBButtons(Tile& pTile)
 {
   uint8_t i;
+
+  if(!m_bCardIn)
+    return;
 
   for(i = 0; i < BUTTON_CNT - 2 && SDList[i].Name[0]; i++)
   {
@@ -133,13 +145,6 @@ String Media::internalFileListJson()
 
 String Media::sdFileListJson()
 {
-  if(m_bDirty)
-  {
-    memset(SDList, 0, sizeof(SDList)); // warning: use same sizes
-    Folder_retrieval(SD_MMC, "/", SDList, FILELIST_CNT-1);
-    m_bDirty = false;
-  }
-
   jsonString js("filesSD");
   js.Array("list", SDList );
   return js.Close();
@@ -155,6 +160,9 @@ void Media::deleteIFile(char *pszFilename)
 
 void Media::deleteSDFile(char *pszFilename)
 {
+  if(!m_bCardIn)
+    return;
+
   String sRemoveFile = "/";
   sRemoveFile += pszFilename;
   SD_MMC.remove(sRemoveFile);
@@ -163,7 +171,8 @@ void Media::deleteSDFile(char *pszFilename)
 
 void Media::setDirty()
 {
-  m_bDirty = true;
+  if(m_bCardIn)
+    m_bDirty = true;
 }
 
 void Media::Audio_Init()
@@ -205,9 +214,6 @@ void Media::Sound(uint8_t n)
 
 void Media::Play(const char* directory, const char* fileName)
 {
-  if(!m_bCardIn)
-    return;
-
   static const char *pLast;
 
   if(fileName == pLast && audio.isRunning())
@@ -225,20 +231,23 @@ void Media::Play(const char* directory, const char* fileName)
   else
     snprintf(filePath, maxPathLength, "%s/%s", directory, fileName);
 
-  if ( SD_MMC.exists(filePath))
+  if(m_bCardIn)
   {
-    audio.pauseResume();
-    vTaskDelay(pdMS_TO_TICKS(100));
-    if( !audio.connecttoFS(SD_MMC,(char*)filePath) )
+    if ( SD_MMC.exists(filePath))
     {
-//      ets_printf("Music Read Failed\r\n");
+      audio.pauseResume();
+      vTaskDelay(pdMS_TO_TICKS(100));
+      if( !audio.connecttoFS(SD_MMC,(char*)filePath) )
+      {
+  //      ets_printf("Music Read Failed\r\n");
+        return;
+      }
+  //    ets_printf("playing\r\n");
+      Pause();
+      Resume();
+      vTaskDelay(pdMS_TO_TICKS(100));
       return;
     }
-//    ets_printf("playing\r\n");
-    Pause();
-    Resume();
-    vTaskDelay(pdMS_TO_TICKS(100));
-    return;
   }
 
   if ( INTERNAL_FS.exists(filePath))
@@ -259,23 +268,20 @@ void Media::Play(const char* directory, const char* fileName)
 
 void Media::Pause()
 {
-  if(!m_bCardIn || !audio.isRunning())
+  if(!audio.isRunning())
     return;
   audio.pauseResume();
 }
 
 void Media::Resume()
 {
-  if(!m_bCardIn || audio.isRunning())
+  if(audio.isRunning())
     return;
   audio.pauseResume();
 }
 
 uint32_t Media::Music_Duration()
 {
-  if(!m_bCardIn)
-    return 0;
-
   uint32_t Audio_duration = audio.getAudioFileDuration(); 
 /*
   if(Audio_duration > 60)
@@ -293,14 +299,10 @@ uint32_t Media::Music_Duration()
 
 uint32_t Media::Music_Elapsed()
 {
-  if(!m_bCardIn)
-    return 0;
   return audio.getAudioCurrentTime();
 }
 
 uint16_t Media::Music_Energy()
 {
-  if(!m_bCardIn)
-    return 0;
   return audio.getVUlevel();
 }
