@@ -34,7 +34,6 @@ SOFTWARE.
 
 #include "eeMem.h"
 #include "WB.h"
-#include "Radar.h"
 #include "TempArray.h"
 #include "THSensor.h"
 #include "Media.h"
@@ -559,8 +558,8 @@ String setupJson()
 
   uint32_t freeK = (INTERNAL_FS.totalBytes() - INTERNAL_FS.usedBytes()) / 1024;
   js.Var("freek",  freeK);
-  freeK = (SD_MMC.totalBytes() - SD_MMC.usedBytes()) / 1024;
-  js.Var("freekSD",  freeK);
+  
+  js.Var("freekSD",  media.SDcardFreeK());
 
   return js.Close();
 }
