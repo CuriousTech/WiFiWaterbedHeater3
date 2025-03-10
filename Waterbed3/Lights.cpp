@@ -69,7 +69,7 @@ void Lights::callQueue(IPAddress ip, uint16_t port, String sUri )
     qIdxIn = 0;
 }
 
-void Lights::setSwitch(char *pName, int8_t bPwr, uint8_t nLevel)
+void Lights::setSwitch(char *pName, int8_t bPwr, uint16_t nLevel)
 {
   uint8_t nLight = m_nSwitch; // last if no name
 
@@ -95,7 +95,7 @@ void Lights::setSwitch(char *pName, int8_t bPwr, uint8_t nLevel)
 
   if(nLevel)
   {
-    uri.Param("level0", nLevel << 1); // dimmers are 1-200
+    uri.Param("level0", nLevel * 10); // dimmers are 1-1000
   }
   callQueue(ip, 80, uri.string());
 }
@@ -272,7 +272,7 @@ void Lights::callback(int8_t iName, char *pName, int32_t iValue, char *psValue)
       break;
     case 3: // level0
       m_nLevel[m_nSwitch] = iValue;
-      display.setSliderValue(BTF_LightsDimmer, m_nLevel[m_nSwitch] );
+      display.setSliderValue(BTF_LightsDimmer, m_nLevel[m_nSwitch] / 10 ); // dimmer is 1-1000, slider is 0-100
       break;
   }
 }
