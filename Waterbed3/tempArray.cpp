@@ -19,6 +19,9 @@ void TempArray::add()
   m_log[iPos].min = (hour() * 60) + minute();
   m_log[iPos].temp = wb.m_currentTemp;
   m_log[iPos].state = wb.m_bHeater;
+#ifdef RADAR_H
+  m_log[iPos].state |= (radar.m_bInBed << 1) | (radar.m_bPresence << 2);
+#endif
   m_log[iPos].rm = ths.m_temp;
   m_log[iPos].rh = ths.m_rh;
 
