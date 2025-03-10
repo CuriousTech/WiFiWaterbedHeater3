@@ -4,10 +4,9 @@
 
 #include <Arduino.h>
 #include "Display.h"
-#include <cstring>
 #include "FS.h"
 #include "SD_MMC.h"
-#include <Audio.h>  // ESP32-audioI2S-master (ESP32 2.0.14 compatible version from WaveShare example) 
+#include <Audio.h>  // ESP32-audioI2S (ESP32 2.0.14 compatible version from WaveShare example) https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-2.8/ESP32-S3-Touch-LCD-2.8-Demo.zip
 
 #define INTERNAL_FS FFat // Make it the same as the partition scheme uploaded (SPIFFS, LittleFS, FFat)
 
@@ -37,6 +36,7 @@ struct FileEntry
   char Name[maxPathLength];
   uint32_t Size;
   time_t Date;
+  bool bDir;
 };
 
 class Media
@@ -46,7 +46,6 @@ public:
   void init(void);
   void service(void);
 
-  uint32_t SDcardFreeK(void);
   void fillFileBButtons(Tile& pTile);
   void Sound(uint8_t n);
   void setVolume(uint8_t volume);
@@ -56,24 +55,29 @@ public:
   uint32_t Music_Duration(void);
   uint32_t Music_Elapsed(void);
   uint16_t Music_Energy(void);
-  String internalFileListJson(void);
-  String sdFileListJson(void);
-  void deleteIFile(char *pszFilename);
-  void deleteSDFile(char *pszFilename);
+
+  bool SDCardAvailable(void);
+  void setFS(char *pszValue);
+  void deleteFile(char *pszFilename);
+  File createFile(String sFilename);
+  void createDir(char *pszName);
+  void setPath(char *szPath);
+  uint32_t freeSpace(void);
   void setDirty(void);
+  const char *currFS(void);
 
   bool m_bPlaying;
   uint8_t m_volume = 100;
 
 private:
-  uint16_t Folder_retrieval(fs::FS &fs, const char* directory, FileEntry list[],uint16_t maxFiles);
   void Audio_Init(void);
 
   bool m_bCardIn;
   bool m_bDirty;
+  bool m_bSDActive;
+  char m_sdPath[maxPathLength * 2];
 #define FILELIST_CNT 32
   FileEntry SDList[FILELIST_CNT];
-  FileEntry InternalList[FILELIST_CNT];
 };
 
 extern Media media;
