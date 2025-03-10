@@ -67,7 +67,7 @@ Radar radar;
 #endif
 
 Lights lights;
-const char *hostName = "Waterbed3"; // Device and OTA name
+const char *hostName = "Waterbed"; // Device and OTA name
 
 bool bConfigDone = false; // EspTouch done or creds set
 bool bStarted = false; // first start
@@ -178,11 +178,13 @@ const char *jsonListCmd[] = {
   "music",
   "restart",
   "ST",
-  "delf",
-  "delfsd",
   "STATTEMP",
-  "STATSETTEMP", // 30
+  "STATSETTEMP",
   "STATFAN",
+  "setfs", // 30
+  "cd",
+  "delf",
+  "createdir",
   NULL
 };
 
@@ -312,22 +314,30 @@ void jsonCallback(int16_t iName, int iValue, char *psValue)
     case 26: // ST
       ee.sleepTime = iValue;
       break;
-    case 27: // delf
-      media.deleteIFile(psValue);
-      ws.textAll(setupJson()); // update disk free
-      break;
-    case 28: // delfsd
-      media.deleteSDFile(psValue);
-      ws.textAll(setupJson()); // update disk free
-      break;
-    case 29: // STATTEMP
+    case 27: // STATTEMP
       display.m_statTemp = iValue;
       break;
-    case 30: // STATSETTEMP
+    case 28: // STATSETTEMP
       display.m_statSetTemp = iValue;
       break;
-    case 31: // STATFAN
+    case 29: // STATFAN
       display.m_bStatFan = iValue;
+      break;
+
+    case 30: // setfs
+      media.setFS(psValue);
+      ws.textAll(setupJson()); // update FS and disk free
+      break;
+    case 31: // cd
+      media.setPath(psValue);
+      break;
+    case 32: // delf
+      media.deleteFile(psValue);
+      ws.textAll(setupJson()); // update disk free
+      break;
+    case 33: // createdir
+      media.createDir(psValue);
+      ws.textAll(setupJson()); // update disk free
       break;
   }
 }
@@ -356,41 +366,6 @@ void parseParams(AsyncWebServerRequest *request)
     if (s == "true") iValue = 1;
 
     jsonCallback(idx, iValue, (char *)s.c_str());
-  }
-}
-
-void onUploadInternal(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
-{
-  static File F;
-
-  if(!index)
-  {
-    String sFile = "/";
-    sFile += filename;
-    F = INTERNAL_FS.open(sFile, "w");
-  }
-  F.write((byte*)data, len);
-  if(final)
-  {
-    F.close();
-  }
-}
-
-void onUploadSD(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
-{
-  static File F;
-
-  if(!index)
-  {
-    String sFile = "/";
-    sFile += filename;
-    F = SD_MMC.open(sFile, "w");
-  }
-  F.write((byte*)data, len);
-  if(final)
-  {
-    F.close();
-    media.setDirty();
   }
 }
 
@@ -448,16 +423,26 @@ void startWiFi()
         request->send_P( 200, "text/html", index_page);
     });
 
-    server.on ( "/upload_internal", HTTP_POST, [](AsyncWebServerRequest * request)
+    server.on ( "/fm.html", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest * request)
+    {
+      request->send_P( 200, "text/html", fileman);
+    });
+
+    server.on ( "/upload", HTTP_POST, [](AsyncWebServerRequest * request)
     {
       request->send( 200);
       ws.textAll(setupJson()); // update free space
-    }, onUploadInternal);
-    server.on ( "/upload_sd", HTTP_POST, [](AsyncWebServerRequest * request)
-    {
-      request->send( 200);
-      ws.textAll(setupJson());
-    }, onUploadSD);
+    },
+    [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
+     {
+      if(!index)
+        request->_tempFile = media.createFile(filename);
+      if(len)
+       request->_tempFile.write((byte*)data, len);
+      if(final)
+        request->_tempFile.close();
+     }
+    );
 
     server.on ( "/s", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest * request)
     {
@@ -482,6 +467,9 @@ void startWiFi()
       AsyncWebServerResponse *response = request->beginResponse_P(200, "image/png", delbtn_png, sizeof(delbtn_png));
       request->send(response);
     });
+
+    server.serveStatic("/", INTERNAL_FS, "/");
+    server.serveStatic("/sd", SD_MMC, "/");
 
     server.begin();
     jsonParse.setList(jsonListCmd);
@@ -514,7 +502,6 @@ String dataJson()
 #endif
   js.Var("eta",  wb.nHeatETA);
   js.Var("cooleta",  wb.nCoolETA);
-
   return js.Close();
 }
 
@@ -539,7 +526,7 @@ void sendState()
 
 String setupJson()
 {
-  jsonString js("set");
+  jsonString js("settings");
   js.Var("tz", ee.tz);
   js.Var("st", ee.sleepTime);
   js.Var("vt", String((float)ee.vacaTemp / 10, 1) );
@@ -555,12 +542,9 @@ String setupJson()
   js.Array("item", ee.schedule, 4);
   js.Array("seasonDays", ee.scheduleDays, 4);
   js.Array("ts", ee.tSecsMon, 12);
-
-  uint32_t freeK = (INTERNAL_FS.totalBytes() - INTERNAL_FS.usedBytes()) / 1024;
-  js.Var("freek",  freeK);
-  
-  js.Var("freekSD",  media.SDcardFreeK());
-
+  js.Var("diskfree",  media.freeSpace() );
+  js.Var("sdavail",  media.SDCardAvailable() );
+  js.Var("currfs", media.currFS());
   return js.Close();
 }
 
@@ -572,11 +556,10 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
     case WS_EVT_CONNECT:      //client connected
       client->text( setupJson() );
       client->text( dataJson() );
-      client->text( media.internalFileListJson() );
-      client->text( media.sdFileListJson() );
       client->text( ta.get() );
       display.m_nWsConnected++;
       WsClientID = client->id();
+      media.setPath("/"); // trigger file list send
       break;
     case WS_EVT_DISCONNECT:    //client disconnected
       if (display.m_nWsConnected)
