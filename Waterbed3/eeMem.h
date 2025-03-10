@@ -73,6 +73,8 @@ public:
   iotLight lights[EE_LIGHT_CNT] =
   {
     {"BRFan", {192,168,31,57}}, // Device to query for the rest
+    {"Dresser", {0}}, // priorities
+    {"Headboard", {0}},
     {},
   };
 
@@ -119,14 +121,14 @@ public:
       {830,  0*60, 3, 0}
     },
   };
-  uint16_t ppkwh = 154; // $0.154 / KWH
+  uint16_t ppkwh = 159; // $0.154 / KWH
   uint16_t rate = 50; // seconds
   uint16_t watts = 290; // Heating pad
   uint32_t tSecsMon[12] = {1254411,1067144,916519,850686,122453,268488,302535,396531,501161,552347,427980,883172}; // total secwatt hours per month (copied from page)
   int16_t  tAdj[2] = {0,0};
   int16_t  pids[3] = {60*3,60*1, 5}; // Todo: real PID
 
-  uint8_t  reserved[52];           // Note: To force an EEPROM update, just subtract 1 byte and flash again
+  uint8_t  reserved[50];           // Note: To force an EEPROM update, just subtract 1 byte and flash again
   uint8_t  end;
 };
 
