@@ -37,35 +37,35 @@ void Radar::init()
 
 void Radar::service()
 {
-  if(radarConnected == false)
-    return;
+//  if(radarConnected == false)
+//    return;
 
   static bool bLastPres;
   m_bPresence = read();
 
-  if(bLastPres != m_bPresence)
+  if(bLastPres == m_bPresence)
+    return;
+
+  if(m_bPresence) // entered room/got up
   {
-    if(m_bPresence) // entered room/got up
+    if(m_bInBed == false && m_bLightOn == false)
     {
-      if(m_bInBed == false && m_bLightOn == false)
-      {
-        display.m_backlightTimer = ee.sleepTime; // reset timer for any touch
-        display.m_brightness = ee.brightLevel;
-        lights.setSwitch("Dresser", 1, 0);
-        lights.setSwitch("Headboard", 1, 0);
-        m_bLightOn = true;
-        display.checkNotif();
-      }
+      display.m_backlightTimer = ee.sleepTime; // reset timer for any touch
+      display.m_brightness = ee.brightLevel;
+      lights.setSwitch("Dresser", 1, 0);
+      lights.setSwitch("Headboard", 1, 0);
+      m_bLightOn = true;
+      display.checkNotif();
     }
-    sendState();
-    bLastPres = m_bPresence;
   }
+  sendState();
+  bLastPres = m_bPresence;
 }
 
 bool Radar::read()
 {
   const uint16_t nOutofBedThreshold = 200; // ~200cm from headboard to foot
-  const uint16_t nInBedThreshold = 45;
+  const uint16_t nInBedThreshold = 32;
 
   static uint8_t nZone = 2;
   static uint8_t nNewZone;
