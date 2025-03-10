@@ -33,7 +33,6 @@ body{width:300px;display:block;margin-left:auto;margin-right:auto;text-align:rig
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js" type="text/javascript" charset="utf-8"></script>
 <script type="text/javascript">
 a=document.all
-oledon=0
 avg=1
 cnt=1
 eco=0
@@ -73,11 +72,9 @@ ws.onmessage=function(evt){
 //  if(eta==0) eta=+d.cooleta
   a.eta.innerHTML='ETA '+t2hms(eta)
  }
- else if(d.cmd=='set')
+ else if(d.cmd=='settings')
  {
   a.vt.value=+d.vt
-  oledon=d.o
-  a.OLED.value=oledon?'ON ':'OFF'
   avg=d.avg
   a.AVG.value=avg?'ON ':'OFF'
   ppkw=d.ppkwh/1000
@@ -91,14 +88,6 @@ ws.onmessage=function(evt){
   schedCnt=d.cnt
   setSeason(d.season)
   draw_bars(d.ts,d.ppkwm)
-  a.free.innerHTML='Internal: '+d.freek+' KB Free'
-  sdfree = +d.freekSD
-  if(sdfree > 1048576)
-    a.freeSD.innerHTML='SDCard: '+(+d.freekSD/1048576).toFixed(2)+' GB Free'
-  else if(sdfree > 10000)
-    a.freeSD.innerHTML='SDCard: '+(+d.freekSD/1024).toFixed()+' MB Free'
-  else
-    a.freeSD.innerHTML='SDCard: '+d.freekSD+' KB Free'
  }
  else if(d.cmd=='tdata')
  {
@@ -117,11 +106,25 @@ ws.onmessage=function(evt){
  }
  else if(d.cmd=='files')
  {
+   d.list.sort(function(a1, b1) {
+    n=a1[0].toLowerCase().localeCompare(b1[0].toLowerCase())
+    if(a1[2]) n-=10
+    if(b1[2]) n+=10
+    return n
+   });
+   idx=0
    for(i=0;i<d.list.length;i++)
     AddFile(d.list[i])
  }
  else if(d.cmd=='filesSD')
  {
+   d.list.sort(function(a1, b1) {
+    n=a1[0].toLowerCase().localeCompare(b1[0].toLowerCase())
+    if(a1[2]) n-=10
+    if(b1[2]) n+=10
+    return n
+   });
+   idx=0
    for(i=0;i<d.list.length;i++)
     AddFileSD(d.list[i])
  }
@@ -185,7 +188,9 @@ function AddFile(item)
 
   td=document.createElement("td")
   td.style.textAlign = "left";
+  td.value=item[0]
   td.innerHTML=' &nbsp; '+item[0].substr(0,31)+' '
+  td.onclick=function(){download(this.value)}
   tr.appendChild(td)
 
   td=document.createElement("td")
@@ -214,10 +219,11 @@ function AddFileSD(item)
 
   td=document.createElement("td")
   td.innerHTML=' '+item[0]+' '
+  td.value=item[0]
   td.style.textAlign = 'left'
   td.style.overflow = 'hidden'
   td.style.textOverflow = 'ellipsis'
-//  td.style.whiteSpace = 'nowrap'
+  td.onclick=function(){downloadSD(this.value)}
   tr.appendChild(td)
 
   td=document.createElement("td")
@@ -245,12 +251,28 @@ function delfileSD(idx,name)
   a.fileListSD.removeChild(l)
 }
 
+function download(name) {
+  const b = document.createElement('a')
+  url = '/fs/'+encodeURIComponent(name)
+  b.href = url
+  b.download = name
+  document.body.appendChild(b)
+  b.click()
+  document.body.removeChild(b)
+}
+function downloadSD(name) {
+  const b = document.createElement('a')
+  url = '/sd/'+encodeURIComponent(name)
+  b.href = url
+  b.download = name
+  document.body.appendChild(b)
+  b.click()
+  document.body.removeChild(b)
+}
+
 function setVar(varName, value)
 {
  ws.send('{"key":"'+a.myKey.value+'","'+varName+'":'+value+'}')
-}
-function oled(){
-setVar('oled',oledon?0:1)
 }
 function setavg(){avg=!avg
 setVar('avg',avg?1:0)
@@ -429,7 +451,7 @@ function draw(){
    y=c2.height-9
    switch((+tdata[i][1]>>1)&3)
    {
-      case 0: ctx.fillStyle="#000"; break
+     case 0: ctx.fillStyle="#000"; break
      case 1:
      case 2: ctx.fillStyle="#70F"; break
      case 3: ctx.fillStyle="#077"; break
@@ -758,12 +780,10 @@ openSocket()
 <tr><td align=center id="time"></td><td align=center><div id="temp"></div> </td><td align=center><div id="tgt"></div></td></tr>
 <tr><td align=center>Bedroom: </td><td align=center><div id="rt"></div></td><td align=center><div id="rh"></div> </td></tr>
 <tr><td id="eta"></td><td> </td>
-<td>Display:<input type="button" value="ON " id="OLED" onClick="{oled()}"></td></tr>
-<tr><td colspan=2>Vacation <input id='vt' type=text size=2 value='-10'><input type='button' id='vo' onclick="{setVaca()}"> &nbsp &nbsp </td>
 <td>Avg: <input type="button" value="OFF" id="AVG" onClick="{setavg()}"></td></tr>
-<tr><td colspan=2></td>
+<tr><td colspan=2>Vacation <input id='vt' type=text size=2 value='-10'><input type='button' id='vo' onclick="{setVaca()}"> &nbsp &nbsp </td>
 <td>Eco: <input type="button" value="OFF" id="eco" onClick="{setEco()}"></td></tr>
-<tr><td>Schedule <input id='inc' type='button' onclick="{setCnt(1)}">Count <input id='dec' type='button' onclick="{setCnt(-1)}"}></td>
+<tr><td>Schedule <input id='inc' type='button' onclick="{setCnt(1)}"><br/>Count <input id='dec' type='button' onclick="{setCnt(-1)}"}></td>
 <td> Temperature<br>Adjust</td>
 <td><input type='button' value='Up' onclick="{setTemp(1)}"> <input type='button' value='All Up' onclick="{setAllTemp(1)}"><br><input type='button' value='Dn' onclick="{setTemp(-1)}"> <input type='button' value='All Dn' onclick="{setAllTemp(-1)}"></td></tr>
 <tr>
@@ -783,23 +803,195 @@ openSocket()
 <div id="popup"><canvas id="tip" width="70" height="48" /></div>
 </div>
 </td></tr>
-<tr><td colspan=2 align="left">PPKWH $<input id='K' type=text size=2 value='0.1457' onchange="{setPPK()}">
+<tr><td colspan=2 align="left">PPKWH $<input id='K' type=text size=2 value='0.1597' onchange="{setPPK()}">
  </td><td> <input id="myKey" name="key" type=text size=40 placeholder="password" style="width: 100px" onChange="{localStorage.setItem('key', key = document.all.myKey.value)}"></td></tr>
-<tr>
-<tr>
-<td colspan=3>
-<div id="dropContainer">
-<table style="font-size:small" id="fileList">
-<p align="left" id="free">Internal: 0K Free</p>
+ <tr><td colspan=2></td><td><input type="submit" value="File Manager" onClick="window.location='/fm.html';"></td>
+ </tr>
 </table>
-</div>
+</body>
+</html>
+)rawliteral";
+
+const char fileman[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>File Manager</title>
+<style>
+div,table{border-radius: 3px;box-shadow: 2px 2px 12px #000000;
+background: rgb(94,94,94);
+background: linear-gradient(0deg, rgba(94,94,94,1) 0%, rgba(160,160,160,1) 100%);
+background-clip: padding-box;}
+input{border-radius: 5px;box-shadow: 2px 2px 12px #000000;
+background: rgb(160,160,160);
+background: linear-gradient(0deg, rgba(160,160,160,1) 0%, rgba(239,239,239,1) 100%);
+background-clip: padding-box;}
+body{width:470px;display:block;margin-left:auto;margin-right:auto;font-family: Arial, Helvetica, sans-serif;}
+</style>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js" type="text/javascript" charset="utf-8"></script>
+<script type="text/javascript">
+a=document.all
+path=''
+idx=0
+var myToken=localStorage.getItem('myStoredText1')
+$(document).ready(function(){
+  openSocket()
+})
+
+function openSocket(){
+ ws=new WebSocket("ws://"+window.location.host+"/ws")
+// ws=new WebSocket("ws://192.168.31.24/ws")
+ ws.onopen=function(evt){}
+ ws.onclose=function(evt){alert("Connection closed.");}
+ ws.onmessage=function(evt){
+ console.log(evt.data)
+  d=JSON.parse(evt.data)
+  if(d.cmd=='state'){
+  }
+  else if(d.cmd=='settings')
+  {
+    a.free.innerHTML=d.currfs+': '+(d.diskfree/1024).toFixed()+' KB Free'
+    if(d.sdavail) a.sdcard.disabled=false
+  }
+  else if(d.cmd=='files')
+  {
+    a.path.innerHTML='CD '+path
+    d.list.sort(function(a1, b1) {
+      n=a1[0].toLowerCase().localeCompare(b1[0].toLowerCase())
+      if(a1[2]) n-=10
+      if(b1[2]) n+=10
+      return n
+    });
+    a.fileList.innerHTML = ''
+    if(d.list.length == 0)
+      a.fileList.innerHTML = 'Drop Files Here'
+    idx=0
+    for(i=0;i<d.list.length;i++)
+     AddFile(d.list[i])
+  }
+  else if(d.cmd=='alert'){alert(d.text)}
+ }
+}
+
+function setVar(varName, value)
+{
+ ws.send('{"key":"'+myToken+'","'+varName+'":'+value+'}')
+}
+
+function AddFile(item)
+{
+  tr=document.createElement("tr")
+  td=document.createElement("td")
+  inp=document.createElement("input")
+  inp.id=idx
+  if(item[0]=='..'){
+   inp.type='button'
+   inp.width=90
+  }else{
+   inp.type='image'
+   inp.value=item[0]
+   inp.onclick=function(){delfile(this.id,this.value)}
+  }
+  inp.src='del-btn.png'
+  td.appendChild(inp)
+  tr.appendChild(td)
+
+  td=document.createElement("td")
+  td.style.textAlign = "left"
+  td.value=item[0]
+  td.innerHTML=' &nbsp; '+item[0].substr(0,31)+' '
+  if(item[2]&1){
+   td.style.color = "yellow"
+   td.onclick=function(){cd(this.value)}
+  }else
+    td.onclick=function(){download(this.value)}
+  tr.appendChild(td)
+
+  td=document.createElement("td")
+  if((item[2]&1)==0){
+    if(item[1]>1024)
+      td.innerHTML=' '+(item[1]/1024).toFixed()+'K'
+    else
+      td.innerHTML=' '+item[1]
+  }
+  tr.appendChild(td)
+
+  tbody=document.createElement("tbody")
+  tbody.id='tbody'+idx
+  tbody.appendChild(tr)
+  a.fileList.appendChild(tbody)
+  idx++
+}
+
+function cd(p)
+{
+  if(p=='..'){
+    pathParts=path.split('/')
+    pathParts.pop()
+    path=pathParts.join('/')
+  }else{
+    if(path.length) path+='/'
+    path+=p
+  }
+  setVar('cd', '/'+path)
+}
+
+function delfile(idx,name)
+{
+  setVar('delf', '"'+fullName(name)+'"')
+  l=document.getElementById('tbody'+idx)
+  a.fileList.removeChild(l)
+}
+
+function fullName(name)
+{
+  if(path) name='/'+path+'/'+name
+  return '/'+name
+}
+function download(name) {
+  const b = document.createElement('a')
+  b.href=encodeURIComponent(fullName(name))
+  b.download = name
+  document.body.appendChild(b)
+  b.click()
+  document.body.removeChild(b)
+}
+</script>
+<style type="text/css">
+input{
+ border-radius: 5px;
+ margin-bottom: 5px;
+ box-shadow: 2px 2px 12px #000000;
+ background-clip: padding-box;
+}
+.range{
+  overflow: hidden;
+}
+.btn {
+  background-color: #50a0ff;
+  padding: 1px;
+  font-size: 12px;
+  min-width: 50px;
+  border: none;
+}
+</style>
+</head>
+<body bgcolor="silver">
+<table>
+<tr><td><input type=button value="Internal" onClick="setVar('setfs','int');">
+<input id=sdcard disabled type=button value="SD Card" onClick="setVar('setfs','SD');">
 </td>
 </tr>
+<tr><td>
+<p align="left" id="free">Internal: 0K Free</p>
+<p align="left" id="path">CD </p>
+</td></tr>
 <tr>
-<td colspan=3>
-<div id="dropContainerSD">
-<table style="font-size:small" id="fileListSD">
-<p align="left" id="freeSD">SDCard: 0K Free</p>
+<td>
+<div id="dropContainer">
+<table style="font-size:small" id="fileList">
+<tr><td>Drop Files Here</td></tr>
 </table>
 </div>
 </td>
@@ -807,33 +999,32 @@ openSocket()
 </table>
 </body>
 <script type="text/javascript">
+function appendToPath(orig, add) {
+  return orig.replace(/\/$/, "") + "/" + add.replace(/^\//, "");
+}
 dropContainer.ondragover = dropContainer.ondragenter = function(ev){ev.preventDefault()}
 dropContainer.ondragend = dropContainer.ondraleave = function(ev){ev.preventDefault()}
 
 dropContainer.ondrop = function(evt) {
-  data = evt.dataTransfer.files[0]
-  formData = new FormData()
-  formData.append("entry", data)
-  fetch('/upload_internal', {method: 'POST', body: formData})
+  data=evt.dataTransfer.files[0]
   evt.preventDefault()
+  item=evt.dataTransfer.items[0].webkitGetAsEntry()
   it=new Array()
   it[0]=data.name
+  it[1]=0
+  it[2]=0
+  if(item.isDirectory)
+  {
+    it[2]=1
+    setVar('createdir','"'+fullName(data.name)+'"')
+    AddFile(it)
+    return
+  }
   it[1]=data.size
+  formData = new FormData()
+  formData.append(data.name,data,fullName(data.name))
+  fetch('/upload', {method: 'POST', body: formData})
   AddFile(it)
-}
-dropContainerSD.ondragover = dropContainerSD.ondragenter = function(ev){ev.preventDefault()}
-dropContainerSD.ondragend = dropContainerSD.ondraleave = function(ev){ev.preventDefault()}
-
-dropContainerSD.ondrop = function(evt) {
-  data = evt.dataTransfer.files[0]
-  formData = new FormData()
-  formData.append("entry", data)
-  fetch('/upload_sd', {method: 'POST', body: formData})
-  evt.preventDefault()
-  it=new Array()
-  it[0]=data.name
-  it[1]=data.size
-  AddFileSD(it)
 }
 </script>
 </html>
