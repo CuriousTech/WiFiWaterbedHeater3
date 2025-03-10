@@ -2,6 +2,8 @@
 #include "eeMem.h"
 #include "jsonString.h"
 
+extern void WsSend(String s);
+
 Audio audio;
 
 Media::Media()
@@ -17,31 +19,36 @@ void Media::service()
   audio.loop();
 
   // non-blocking dir list because this can take a while
-  if(m_bCardIn)
+  if(!m_bCardIn)
+    return;
+
+  if(m_bDirty)
   {
-    if(m_bDirty)
+    m_bDirty = false;
+    if(Path = SD_MMC.open(m_sdPath[0] ? m_sdPath : "/"))
     {
-      m_bDirty = false;
-      Path = SD_MMC.open("/");
+      memset(SDList, 0, sizeof(SDList));
       file = Path.openNextFile();
-      fileCount = 0;
     }
-  
-    if(Path && file)
+    fileCount = 0;
+  }
+
+  if(Path && file)
+  {
+    strncpy(SDList[fileCount].Name, file.name(), maxPathLength - 1);
+    SDList[fileCount].Size = file.size();
+    SDList[fileCount].bDir = file.isDirectory();
+    SDList[fileCount].Date = file.getLastWrite();
+    fileCount++;
+    file = Path.openNextFile();
+    if(!file || fileCount >= FILELIST_CNT - 1 )
     {
-      if (!file.isDirectory())
-      {
-        strncpy(SDList[fileCount].Name, file.name(), maxPathLength - 1);
-        SDList[fileCount].Size = file.size();
-        SDList[fileCount].Date = file.getLastWrite();
-        fileCount++;
-      }
-      file = Path.openNextFile();
-      if(!file || fileCount >= FILELIST_CNT - 1 )
-      {
-        file.close();
-        Path.close();
-      }
+      file.close();
+      Path.close();
+
+      jsonString js("files");
+      js.Array("list", SDList, m_sdPath[1] ? true:false );
+      WsSend(js.Close());
     }
   }
 }
@@ -57,34 +64,22 @@ void Media::init()
   digitalWrite(SD_D3_PIN, HIGH); //enable
   vTaskDelay(pdMS_TO_TICKS(10));
 
+  INTERNAL_FS.begin(true);
+
   if (SD_MMC.begin("/sdcard", true, true) )
   {
     uint8_t cardType = SD_MMC.cardType();
-  
+
     if(cardType == CARD_NONE || cardType == CARD_UNKNOWN)
     {
 //      ets_printf("No SD card\r\n");
       return;
     }
     m_bCardIn = true;
+    strcpy(m_sdPath, "/"); // start with root
+    setDirty();
   }
-
-  if(INTERNAL_FS.begin(true))
-  {
-    Folder_retrieval(INTERNAL_FS, "/", InternalList, FILELIST_CNT - 2);
-  }
-
-  setDirty();
 }
-
-uint32_t Media::SDcardFreeK()
-{
-  if(!m_bCardIn)
-    return 0;
-
-  return (SD_MMC.totalBytes() - SD_MMC.usedBytes()) / 1024;
-}
-
 
 void Media::fillFileBButtons(Tile& pTile)
 {
@@ -103,76 +98,6 @@ void Media::fillFileBButtons(Tile& pTile)
   }
 
   pTile.button[i].row = 0xFF; // end row
-}
-
-uint16_t Media::Folder_retrieval(fs::FS &fs, const char* directory, FileEntry list[], uint16_t maxFiles)
-{
-  File Path = fs.open(directory);
-  if (!Path)
-  {
-//    ets_printf("Path: <%s> does not exist\r\n", directory);
-    return 0;
-  }
-  
-  uint16_t fileCount = 0;
-  File file = Path.openNextFile();
-
-  while (file && fileCount < maxFiles)
-  {
-    if (!file.isDirectory())
-    {
-      strncpy(list[fileCount].Name, file.name(), maxPathLength - 1);
-      list[fileCount].Size = file.size();
-      list[fileCount].Date = file.getLastWrite();
-      fileCount++;
-    }
-    file = Path.openNextFile();
-  }
-  Path.close();                                                         
-  return fileCount;                                                 
-}
-
-String Media::internalFileListJson()
-{
-  // refresh the list before sending
-  memset(InternalList, 0, sizeof(InternalList));
-  Folder_retrieval(INTERNAL_FS, "/", InternalList, FILELIST_CNT-1);
-
-  jsonString js("files");
-  js.Array("list", InternalList);
-  return js.Close();
-}
-
-String Media::sdFileListJson()
-{
-  jsonString js("filesSD");
-  js.Array("list", SDList );
-  return js.Close();
-}
-
-
-void Media::deleteIFile(char *pszFilename)
-{
-  String sRemoveFile = "/";
-  sRemoveFile += pszFilename;
-  INTERNAL_FS.remove(sRemoveFile);
-}
-
-void Media::deleteSDFile(char *pszFilename)
-{
-  if(!m_bCardIn)
-    return;
-
-  String sRemoveFile = "/";
-  sRemoveFile += pszFilename;
-  SD_MMC.remove(sRemoveFile);
-  m_bDirty = true;
-}
-
-void Media::setDirty()
-{
-  if(m_bCardIn)
-    m_bDirty = true;
 }
 
 void Media::Audio_Init()
@@ -263,7 +188,6 @@ void Media::Play(const char* directory, const char* fileName)
     vTaskDelay(pdMS_TO_TICKS(100));
     return;
   }
-
 }
 
 void Media::Pause()
@@ -305,4 +229,135 @@ uint32_t Media::Music_Elapsed()
 uint16_t Media::Music_Energy()
 {
   return audio.getVUlevel();
+}
+
+bool Media::SDCardAvailable()
+{
+  return m_bCardIn;
+}
+
+const char *Media::currFS()
+{
+  return m_bSDActive ? "SDCard" : "Internal";
+}
+
+void Media::setFS(char *pszValue)
+{
+  m_bSDActive = !strcmp(pszValue, "SD"); // For now, just use SD
+  setPath("/");
+}
+
+uint32_t Media::freeSpace()
+{
+  uint32_t nFree;
+
+  if(m_bSDActive)
+  {
+    if(m_bCardIn)
+      nFree = SD_MMC.totalBytes() - SD_MMC.usedBytes();
+  }
+  else
+  {
+    nFree = INTERNAL_FS.totalBytes() - INTERNAL_FS.usedBytes();
+  }
+  return nFree;
+}
+
+void Media::setPath(char *szPath)
+{
+  if(m_bSDActive)
+  {
+    strncpy(m_sdPath, szPath, sizeof(m_sdPath)-1);
+    setDirty();
+
+    String s = "{\"cmd\":\"files\",\"list\":[";
+    if(szPath[1])
+      s += "[\"..\",0,1,0]";
+    s += "]}";
+    WsSend(s); // fill in for an empty dir
+  }
+  else
+  {
+    File Path = INTERNAL_FS.open(szPath[0] ? szPath : "/");
+    if (!Path)
+      return;
+
+    uint16_t fileCount = 0;
+    File file = Path.openNextFile();
+  
+    String s = "{\"cmd\":\"files\",\"list\":[";
+    if(szPath[1])
+    {
+      s += "[\"..\",0,1,0]";
+      fileCount++;
+    }
+
+    while (file)
+    {
+      if(fileCount)
+        s += ",";
+      s += "[\"";
+      s += file.name();
+      s += "\",";
+      s += file.size();
+      s += ",";
+      s += file.isDirectory();
+      s += ",";
+      s += file.getLastWrite();
+      s += "]";
+      fileCount++;
+      file = Path.openNextFile();
+    }
+    Path.close();
+    s += "]}";
+    WsSend(s);
+  }
+}
+
+void Media::deleteFile(char *pszFilename)
+{
+  String sRemoveFile = "/";
+  sRemoveFile += pszFilename;
+
+  if(m_bSDActive)
+  {
+    if(!m_bCardIn)
+      return;
+    SD_MMC.remove(sRemoveFile);
+    m_bDirty = true;
+  }
+  else
+  {
+    INTERNAL_FS.remove(sRemoveFile);
+  }
+}
+
+File Media::createFile(String sFilename)
+{
+  String sFile = "/";
+  sFile += sFilename;
+
+  if(m_bSDActive)
+    return SD_MMC.open(sFile, "w");
+  return INTERNAL_FS.open(sFile, "w");
+}
+
+void Media::createDir(char *pszName)
+{
+  if(m_bSDActive)
+  {
+   if( !SD_MMC.exists(pszName) )
+    SD_MMC.mkdir(pszName);
+  }
+  else
+  {
+    if( !INTERNAL_FS.exists(pszName) )
+      INTERNAL_FS.mkdir(pszName);
+  }
+}
+
+void Media::setDirty()
+{
+  if(m_bCardIn)
+    m_bDirty = true;
 }
