@@ -30,7 +30,7 @@ public:
   Lights(void);
   void init(void);
   void service(void);
-  void setSwitch(char *pName, int8_t bPwr, uint8_t nLevel);
+  void setSwitch(char *pName, int8_t bPwr, uint16_t nLevel);
   bool getSwitch(const char *pName);
   int checkStatus();
   void clearQueue(void);
@@ -54,7 +54,7 @@ private:
   bool m_bQuery;
   int m_bufIdx;
   bool m_bOn[EE_LIGHT_CNT][2];
-  uint8_t m_nLevel[EE_LIGHT_CNT];
+  uint16_t m_nLevel[EE_LIGHT_CNT];
 
 #define CQ_CNT 16
   cQ queue[CQ_CNT];
