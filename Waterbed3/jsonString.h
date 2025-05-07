@@ -250,6 +250,25 @@ public:
     s += "]";
     m_cnt++;
   }
+
+  void ArrayPts(const char *key, int16_t pts[][2], int n)
+  {
+    if(m_cnt) s += ",";
+    s += "\"";
+    s += key;
+    s += "\":[";
+    for(int i = 0; i < n; i++)
+    {
+      if(i) s += ",";
+      s += '[';
+      s += pts[i][0];
+      s += ',';
+      s += pts[i][1];
+      s += ']';
+    }
+    s += "]";
+    m_cnt++;
+  }
 protected:
   String s;
   int m_cnt;
