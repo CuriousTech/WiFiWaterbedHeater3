@@ -45,6 +45,9 @@ enum Button_Function
   BTF_Stat_Fan,
 
   BTF_TrackBtn,
+
+  BTF_ProgressBar,
+  BTF_RadarDist,
 };
 
 // Button flags
@@ -193,21 +196,24 @@ Tile layout
       0,
       0,
       {
-        { 0, BF_FIXED_POS|BF_TEXT, BTF_Time,  "12:00", &DIGIRT_40pt7b, TFT_CYAN, {0}, {3, 2, 160, 50}},
-        { 0, BF_FIXED_POS|BF_TEXT, BTF_AMPM, "00 AM SUN", &DIGIRT_18pt7b, TFT_CYAN, {0}, {180, 2, 120, 32} },
-        { 0, BF_FIXED_POS|BF_TEXT, BTF_Date,  "Jan 01", &DIGIRT_18pt7b, TFT_CYAN, {0}, {180, 33, 80, 32}},
+        { 0, BF_FIXED_POS|BF_TEXT, BTF_Time,  "12:00",    &DIGIRT_40pt7b, TFT_CYAN,  {0}, {  3,  2, 160, 50} },
+        { 0, BF_FIXED_POS|BF_TEXT, BTF_AMPM, "00 AM SUN", &DIGIRT_18pt7b, TFT_CYAN,  {0}, {180,  2, 120, 32} },
+        { 0, BF_FIXED_POS|BF_TEXT, BTF_Date,  "Jan 01",   &DIGIRT_18pt7b, TFT_CYAN,  {0}, {180, 33,  80, 32} },
 
-        { 1, BF_FIXED_POS|BF_TEXT, BTF_None, "Room Temp", &FreeSans7pt7b, TFT_WHITE, {0}, {40, 125, 80, 32}},
-        { 1, BF_FIXED_POS|BF_TEXT, BTF_RoomTemp,  "0.0", &DIGIRT_18pt7b, TFT_CYAN, {0}, {40, 148, 80, 32} },
-        { 1, BF_FIXED_POS|BF_TEXT, BTF_None, "Out Temp", &FreeSans7pt7b, TFT_WHITE, {0}, {40, 175, 80, 32} },
-        { 1, BF_FIXED_POS|BF_TEXT, BTF_OutTemp,  "0.0", &DIGIRT_18pt7b, TFT_CYAN, {0}, {40, 198, 80, 32} },
+        { 1, BF_FIXED_POS|BF_TEXT, BTF_None, "Room Temp", &FreeSans7pt7b, TFT_WHITE, {0}, {40, 125, 80, 32} },
+        { 1, BF_FIXED_POS|BF_TEXT, BTF_RoomTemp,  "0.0",  &DIGIRT_18pt7b, TFT_CYAN,  {0}, {40, 148, 80, 32} },
+        { 1, BF_FIXED_POS|BF_TEXT, BTF_None, "Out Temp",  &FreeSans7pt7b, TFT_WHITE, {0}, {40, 175, 80, 32} },
+        { 1, BF_FIXED_POS|BF_TEXT, BTF_OutTemp,   "0.0",  &DIGIRT_18pt7b, TFT_CYAN,  {0}, {40, 198, 80, 32} },
 
-        { 1, BF_FIXED_POS|BF_TEXT, BTF_None, "Set Temp", &FreeSans7pt7b, TFT_WHITE, {0}, {DISPLAY_WIDTH-140, 125, 80, 32}},
-        { 1, BF_FIXED_POS|BF_TEXT, BTF_SetTemp,  "0.0", &DIGIRT_18pt7b, TFT_CYAN, {0}, {DISPLAY_WIDTH-140, 148, 80, 32}},
-        { 1, BF_FIXED_POS|BF_TEXT, BTF_None, "Bed Temp", &FreeSans7pt7b, TFT_WHITE, {0}, {DISPLAY_WIDTH-140, 175, 80, 32}},
-        { 1, BF_FIXED_POS|BF_TEXT, BTF_WBTemp,  "0.0", &DIGIRT_18pt7b, TFT_CYAN, {0}, {DISPLAY_WIDTH-140, 198, 80, 32}},
+#ifdef RADAR_H
+        { 1, BF_FIXED_POS|BF_TEXT, BTF_RadarDist,   "0.0",  &FreeSans9pt7b, TFT_CYAN,  {0}, {40, 100, 200, 32}},
+#endif
+        { 1, BF_FIXED_POS|BF_TEXT, BTF_None, "Set Temp",  &FreeSans7pt7b, TFT_WHITE, {0}, {DISPLAY_WIDTH-140, 125, 80, 32}},
+        { 1, BF_FIXED_POS|BF_TEXT, BTF_SetTemp,   "0.0",  &DIGIRT_18pt7b, TFT_CYAN,  {0}, {DISPLAY_WIDTH-140, 148, 80, 32}},
+        { 1, BF_FIXED_POS|BF_TEXT, BTF_None, "Bed Temp",  &FreeSans7pt7b, TFT_WHITE, {0}, {DISPLAY_WIDTH-140, 175, 80, 32}},
+        { 1, BF_FIXED_POS|BF_TEXT, BTF_WBTemp,    "0.0",  &DIGIRT_18pt7b, TFT_CYAN,  {0}, {DISPLAY_WIDTH-140, 198, 80, 32}},
 
-        { 1, BF_FIXED_POS|BF_REPEAT|BF_ARROW_UP, BTF_WbTempInc, NULL, NULL, 0, {0}, {DISPLAY_WIDTH-40, 140, 40, 44}},
+        { 1, BF_FIXED_POS|BF_REPEAT|BF_ARROW_UP,   BTF_WbTempInc, NULL, NULL, 0, {0}, {DISPLAY_WIDTH-40, 140,    40, 44}},
         { 1, BF_FIXED_POS|BF_REPEAT|BF_ARROW_DOWN, BTF_WbTempDec, NULL, NULL, 0, {0}, {DISPLAY_WIDTH-40, 140+46, 40, 44}},
 
         { 0, BF_FIXED_POS, BTF_RSSI,        "", NULL, 0, {0}, {6, DISPLAY_HEIGHT - 6, 26, 26}  },
