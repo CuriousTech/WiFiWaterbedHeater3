@@ -45,15 +45,16 @@ max2=300
 dispIdx=0
 mod=5
 btn=0
+zoom=18
+ballrad=6
 va=new Array()
 
-//   t,   pres,   mov , sta,   inBed,  distS distM   en   enM
-colors=['#00F','#0F0','#FF0','#0FF','#F0F','#F00','#77F','#777']
+colors=['#f0F','#0F0','#FF0']
 
 function openSocket(){
+initradar()
 ws=new WebSocket("ws://"+window.location.host+"/ws")
 //ws=new WebSocket("ws://192.168.31.8/ws")
-
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
@@ -65,7 +66,7 @@ ws.onmessage=function(evt){
   a.time.innerHTML=dt.toLocaleTimeString()
   waterTemp=+d.waterTemp
   a.temp.innerHTML=(d.on?"<font color='red'><b>":"")+waterTemp+"&deg"+cf+(d.on?"</b></font>":"")
-  a.tgt.innerHTML="> "+d.hiTemp+"&deg"+cf
+  a.tgt.innerHTML="&#129146 "+d.hiTemp+"&deg"+cf
   a.rt.innerHTML=+d.temp+'&deg'+cf
   a.rh.innerHTML=+d.rh+'%'
   eta=+d.eta
@@ -88,6 +89,7 @@ ws.onmessage=function(evt){
   schedCnt=d.cnt
   setSeason(d.season)
   draw_bars(d.ts,d.ppkwm)
+  bedpoints=d.radarpts
  }
  else if(d.cmd=='tdata')
  {
@@ -96,37 +98,9 @@ ws.onmessage=function(evt){
  }
  else if(d.cmd=='radar')
  {
-  if(min2>+d.dist) min2=+d.dist
-  if(min2>+d.distM) min2=+d.distM
-  if(max2<+d.dist) max2=+d.dist
-  if(max2<+d.distM) max2=+d.distM
-   aa=[+d.t,(+d.bits&1)?50:0,(+d.bits>>1&3)*50,(+d.bits&4)?50:0,+d.dist,+d.distM,+d.en,+d.enM]
-   va.push(aa)
-   draw_chart()
- }
- else if(d.cmd=='files')
- {
-   d.list.sort(function(a1, b1) {
-    n=a1[0].toLowerCase().localeCompare(b1[0].toLowerCase())
-    if(a1[2]) n-=10
-    if(b1[2]) n+=10
-    return n
-   });
-   idx=0
-   for(i=0;i<d.list.length;i++)
-    AddFile(d.list[i])
- }
- else if(d.cmd=='filesSD')
- {
-   d.list.sort(function(a1, b1) {
-    n=a1[0].toLowerCase().localeCompare(b1[0].toLowerCase())
-    if(a1[2]) n-=10
-    if(b1[2]) n+=10
-    return n
-   });
-   idx=0
-   for(i=0;i<d.list.length;i++)
-    AddFileSD(d.list[i])
+  dt=new Date(d.t*1000)
+  a.time.innerHTML=dt.toLocaleTimeString()
+   draw_radar(+d.X,+d.Y,+d.pres,+d.zone)
  }
  else if(d.cmd=='alert')
  {
@@ -171,103 +145,6 @@ function setSeason(s)
   }
   a.inc.value=Math.min(8,cnt+1)
   a.dec.value=Math.max(1,cnt-1)
-}
-
-function AddFile(item)
-{
-  tr=document.createElement("tr")
-  td=document.createElement("td")
-  inp=document.createElement("input")
-  inp.id=idx
-  inp.type='image'
-  inp.value=item[0]
-  inp.src='del-btn.png'
-  inp.onclick=function(){delfile(this.id,this.value)}
-  td.appendChild(inp)
-  tr.appendChild(td)
-
-  td=document.createElement("td")
-  td.style.textAlign = "left";
-  td.value=item[0]
-  td.innerHTML=' &nbsp; '+item[0].substr(0,31)+' '
-  td.onclick=function(){download(this.value)}
-  tr.appendChild(td)
-
-  td=document.createElement("td")
-  td.innerHTML=' '+(item[1]/1024).toFixed()+'K'
-  tr.appendChild(td)
-
-  tbody=document.createElement("tbody")
-  tbody.id='tbody'+idx
-  tbody.appendChild(tr)
-  a.fileList.appendChild(tbody)
-  idx++
-}
-
-function AddFileSD(item)
-{
-  tr=document.createElement("tr")
-  td=document.createElement("td")
-  inp=document.createElement("input")
-  inp.id=idx
-  inp.type='image'
-  inp.value=item[0]
-  inp.src='del-btn.png'
-  inp.onclick=function(){delfileSD(this.id,this.value)}
-  td.appendChild(inp)
-  tr.appendChild(td)
-
-  td=document.createElement("td")
-  td.innerHTML=' '+item[0]+' '
-  td.value=item[0]
-  td.style.textAlign = 'left'
-  td.style.overflow = 'hidden'
-  td.style.textOverflow = 'ellipsis'
-  td.onclick=function(){downloadSD(this.value)}
-  tr.appendChild(td)
-
-  td=document.createElement("td")
-  td.innerHTML=' '+(item[1]/1024).toFixed()+'K'
-  tr.appendChild(td)
-
-  tbody=document.createElement("tbody")
-  tbody.id='tbody'+idx
-  tbody.appendChild(tr)
-  a.fileListSD.appendChild(tbody)
-  idx++
-}
-
-function delfile(idx,name)
-{
-  setVar('delf', name)
-  l=document.getElementById('tbody'+idx)
-  a.fileList.removeChild(l)
-}
-
-function delfileSD(idx,name)
-{
-  setVar('delfsd', name)
-  l=document.getElementById('tbody'+idx)
-  a.fileListSD.removeChild(l)
-}
-
-function download(name) {
-  const b = document.createElement('a')
-  url = '/fs/'+encodeURIComponent(name)
-  b.href = url
-  b.download = name
-  document.body.appendChild(b)
-  b.click()
-  document.body.removeChild(b)
-}
-function downloadSD(name) {
-  const b = document.createElement('a')
-  url = '/sd/'+encodeURIComponent(name)
-  b.href = url
-  b.download = name
-  document.body.appendChild(b)
-  b.click()
-  document.body.removeChild(b)
 }
 
 function setVar(varName, value)
@@ -444,19 +321,18 @@ function draw(){
     ctx.moveTo(x,y)
   }
 
-  for(i=0;i<tdata.length;i++) // presence
+  for(i=0;i<tdata.length;i++) // zone
   {
-   if(+tdata[i][1]&6==0) continue;
+   if((+tdata[i][1]>>1) == 0) continue;
    x=tm2x(i*5)
    y=c2.height-9
    switch((+tdata[i][1]>>1)&3)
    {
-     case 0: ctx.fillStyle="#000"; break
-     case 1:
-     case 2: ctx.fillStyle="#70F"; break
-     case 3: ctx.fillStyle="#077"; break
+     case 0: ctx.fillStyle="#70F"; break
+     case 1: ctx.fillStyle="#00F"; break
+     case 2: ctx.fillStyle="#000"; break
    }
-  ctx.fillRect(x,y, 3, 9);
+   ctx.fillRect(x,y, 3, 9);
   }
 
   dt=new Date()
@@ -562,14 +438,6 @@ function draw_bars(ar,pp)
     }
     if(!hit){popup.style.left="-1000px"}
   }
-
-  function getMousePos(cDom, mEv){
-    rect = cDom.getBoundingClientRect();
-    return{
-     x: mEv.clientX-rect.left,
-     y: mEv.clientY-rect.top
-    }
-  }
 }
 
 function draw_scale(ar,pp,w,h,o,p,ct)
@@ -610,8 +478,8 @@ function draw_scale(ar,pp,w,h,o,p,ct)
       ctx.strokeStyle="#000"
       ctx.lineWidth=1
       ctx.beginPath()
-        ctx.moveTo(x+lw+1,o+h-2)
-        ctx.lineTo(x+lw+1,o+1)
+      ctx.moveTo(x+lw+1,o+h-2)
+      ctx.lineTo(x+lw+1,o+1)
       ctx.stroke()
       ctx.lineWidth=lw
     }
@@ -649,93 +517,133 @@ function t2hms(t)
   return t+'d '+h+':'+m+':'+s
 }
 
-function draw_chart(){
-try {
-  var c=document.getElementById('chart')
+function initradar()
+{
+  radar = $('#radar')
+  var c=document.getElementById('radar')
+  mouseDown=false
+  hit=false
+  select=0
+  radar.mousemove(function(e){
+    rect=c.getBoundingClientRect()
+    mouseX=e.clientX-rect.x
+    mouseY=e.clientY-rect.y
+    if(hit)
+    {
+        bedpoints[select][0]=(mouseX-(c.width/2))*zoom
+        bedpoints[select][1]=mouseY*zoom
+        switch(select){
+            case 0:
+              if(bedpoints[0][0] >= bedpoints[1][0]) bedpoints[0][0] = bedpoints[1][0]-1
+              if(bedpoints[0][1] >= bedpoints[3][1]) bedpoints[0][1] = bedpoints[3][1]-1
+              if(bedpoints[0][1] >= bedpoints[2][1]) bedpoints[0][1] = bedpoints[2][1]-1
+              break
+            case 1:
+              if(bedpoints[1][0] <= bedpoints[0][0]) bedpoints[1][0] = bedpoints[0][0]+1
+              if(bedpoints[1][1] >= bedpoints[2][1]) bedpoints[1][1] = bedpoints[2][1]-1
+              break
+            case 2:
+              if(bedpoints[2][0] <= bedpoints[3][0]) bedpoints[2][0] = bedpoints[3][0]+1
+              if(bedpoints[2][0] <= bedpoints[0][0]) bedpoints[2][0] = bedpoints[0][0]+1
+              if(bedpoints[2][1] <= bedpoints[1][1]) bedpoints[2][1] = bedpoints[1][1]+1
+              break
+            case 3:
+              if(bedpoints[3][0] >= bedpoints[2][0]) bedpoints[3][0] = bedpoints[2][0]-1
+              if(bedpoints[3][1] <= bedpoints[0][1]) bedpoints[3][1] = bedpoints[0][1]+1
+              break
+        }
+      }
+      else if(mouseDown)
+      {
+        x=(mouseX-(c.width/2))*zoom
+        y=mouseY*zoom
+        z=0
+        xL=(bedpoints[3][0]-bedpoints[0][0]) * (y-bedpoints[0][0]) / (bedpoints[3][1]-bedpoints[0][1]) + bedpoints[0][0]
+        xR=(bedpoints[2][0]-bedpoints[1][0]) * (y-bedpoints[1][0]) / (bedpoints[2][1]-bedpoints[1][1]) + bedpoints[1][0]
+        yT=(bedpoints[1][1]-bedpoints[0][1]) * (x-bedpoints[0][1]) / (bedpoints[1][0]-bedpoints[0][0]) + bedpoints[1][1]
+        yB=(bedpoints[2][1]-bedpoints[3][1]) * (x-bedpoints[3][1]) / (bedpoints[2][0]-bedpoints[3][0]) + bedpoints[2][1]
+
+        if(x>=xL&&x<=xR&&y>=yT&&y<=yB)
+          z=1
+        testdraw(x,y,z)
+      }
+  })
+  radar.mousedown(function(e){
+    rect=c.getBoundingClientRect()
+    mouseX=e.clientX-rect.x
+    mouseY=e.clientY-rect.y
+    mouseDown=true
+    for(i=0;i<4;i++){
+      x = c.width/2+bedpoints[i][0]/zoom
+      y = bedpoints[i][1]/zoom
+      if(mouseX<x+ballrad&&mouseX>x-ballrad&&mouseY<y+ballrad&&mouseY>y-ballrad){
+       hit=true
+       select=i
+      }
+    }
+  })
+  radar.mouseup(function(e){
+    mouseDown=false
+    hit=false
+    setVar('radarpts','"'+bedpoints.join(',')+'"')
+  })
+}
+
+function testdraw(x,y,zone)
+{
+  try {
+  var c=document.getElementById('radar')
   ctx=c.getContext("2d")
-  while(va.length>65500) va.shift()
+  ctx.fillStyle=colors[zone]
+  ctx.beginPath()
+  x=c.width/2+x/zoom
+  ctx.ellipse(x, y/zoom, ballrad-3, ballrad-3, 0, 0, Math.PI*2)
+  ctx.fill()
+}catch(err){}
+}
+
+function draw_radar(x,y,pres,zone){
+try {
+  var c=document.getElementById('radar')
+  ctx=c.getContext("2d")
   ctx.fillStyle="#222"
   ctx.fillRect(0,0,c.width,c.height)
   ctx.fillStyle="#FFF"
   ctx.lineWidth=1
   ctx.font="bold 10px sans-serif"
   ctx.textAlign="right"
-  h=c.height-60
-  if(min2<0){
-    base=h/2
-    range=h/2
-  }else{
-    base=h
-    range=h
-  }
-  bd=10
-  base+=bd
-  fVal=min2
-  for(i=6;i>=0;i--)
-  {
-    y=(i/6*h)+bd
-    ctx.strokeStyle="#FFF"
-    ctx.fillText(fVal.toFixed(),20,y+3)
-    fVal+=(max2-min2)/6
-    ctx.strokeStyle="#555"
+  ctx.fillText('X='+x,40,10)
+  ctx.fillText('Y='+y,80,10)
+  ctx.fillText('Zone='+zone,c.width-10,10)
+  if(pres){
+    ctx.fillStyle=colors[zone]
     ctx.beginPath()
-    ctx.moveTo(21,y)
-    ctx.lineTo(c.width,y)
-    ctx.stroke()
+    x=c.width/2+x/zoom
+    ctx.ellipse(x, y/zoom, ballrad+3, ballrad+3, 0, 0, Math.PI*2)
+    ctx.fill()
   }
-
-  ctx.strokeStyle = "#555"
-  m=0
-  ctx.font="10px sans-serif"
-  ctx.fillText(zoom+':1',c.width-1,10)
-  for(i=va.length-1-dispIdx,x=c.width-1;x>20&&i>=0;i-=zoom,x--)
+  ctx.fillStyle="blue"
+  for(i=0;i<4;i++)
   {
-    if(x%100==21)
-    {
-      ctx.beginPath()
-      ctx.moveTo(x,h+bd)
-      ctx.lineTo(x,bd)
-      ctx.stroke()
-//      ctx.save()
-//      ctx.translate(x+30, h+60)
-//      ctx.rotate(0.9)
-//      ctx.fillText(va[i][0].toLocaleTimeString(),0,0)
-//      ctx.restore()
-    }
+    ctx.beginPath()
+    x=c.width/2+bedpoints[i][0]/zoom
+    y=bedpoints[i][1]/zoom
+    ctx.ellipse(x, y, ballrad, ballrad, 0, 0, Math.PI*2)
+    ctx.fill()
   }
-
-  ciel=max2
-  for(line=1;line<9;line++)
+  ctx.strokeStyle='#FA0'
+  ctx.beginPath()
+  for(i=0;i<4;i++)
   {
-    start=0
-    ctx.strokeStyle=colors[line-1]
-    for(i=va.length-1-dispIdx,x=c.width-1;x>20&&i>=0;i-=zoom,x--)
-    {
-      if(typeof(va[i][line])!='undefined'){
-        v0=va[i][line]
-        y=base-(v0/ciel*range)
-        if(!start){start=1;ctx.beginPath();ctx.moveTo(c.width-1,y)}
-        else if(start)
-        {
-          if(zoom>1)
-          {
-            min2=max2=y
-            for(j=i+1;j<i+zoom;j++)
-            {
-              y=base-(va[j][line]/ciel*range)
-              if(y<min2) min2=y
-              if(y>max2) max2=y
-            }
-            if(min2<y) ctx.lineTo(x,min2)
-            if(max2>y) ctx.lineTo(x,max2)
-          }
-          ctx.lineTo(x,y)
-        }
-      }
-      else if(start){ctx.stroke();start=0;}
-    }
-    if(start)ctx.stroke()
+    x=c.width/2+bedpoints[i][0]/zoom
+    y=bedpoints[i][1]/zoom
+    if(i==0) ctx.moveTo(x,y)
+    else ctx.lineTo(x,y)
   }
+  x=c.width/2+bedpoints[0][0]/zoom
+  y=bedpoints[0][1]/zoom
+  ctx.lineTo(x,y)
+  ctx.stroke()
 }catch(err){}
 }
 </script>
@@ -754,13 +662,6 @@ try {
   width: 100%;
   height: 100%;
   position: relative;
-}
-#chart{
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
 }
 #popup {
   position: absolute;
@@ -807,6 +708,7 @@ openSocket()
  </td><td> <input id="myKey" name="key" type=text size=40 placeholder="password" style="width: 100px" onChange="{localStorage.setItem('key', key = document.all.myKey.value)}"></td></tr>
  <tr><td colspan=2></td><td><input type="submit" value="File Manager" onClick="window.location='/fm.html';"></td>
  </tr>
+<tr><td colspan=3><canvas id="radar" width="300" height="300" style="float:center" /"></td></tr>
 </table>
 </body>
 </html>
@@ -832,7 +734,7 @@ body{width:470px;display:block;margin-left:auto;margin-right:auto;font-family: A
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js" type="text/javascript" charset="utf-8"></script>
 <script type="text/javascript">
 a=document.all
-path=''
+path='/'
 idx=0
 var myToken=localStorage.getItem('myStoredText1')
 $(document).ready(function(){
@@ -841,7 +743,7 @@ $(document).ready(function(){
 
 function openSocket(){
  ws=new WebSocket("ws://"+window.location.host+"/ws")
-// ws=new WebSocket("ws://192.168.31.24/ws")
+// ws=new WebSocket("ws://192.168.31.103/ws")
  ws.onopen=function(evt){}
  ws.onclose=function(evt){alert("Connection closed.");}
  ws.onmessage=function(evt){
@@ -851,12 +753,20 @@ function openSocket(){
   }
   else if(d.cmd=='settings')
   {
-    a.free.innerHTML=d.currfs+': '+(d.diskfree/1024).toFixed()+' KB Free'
+    if(d.diskfree>1024*1024)
+      a.free.innerHTML=(d.diskfree/1024/1024).toFixed(1)+' MB Free'
+    else if(d.diskfree>10240)
+      a.free.innerHTML=(d.diskfree/1024).toFixed()+' KB Free'
+    else
+      a.free.innerHTML=d.diskfree+' B Free'
     if(d.sdavail) a.sdcard.disabled=false
+    sdcard=(d.currfs=='SDCard')
+    a.sdcard.setAttribute('style',sdcard?'color:blue':'')
+    a.int.setAttribute('style',sdcard?'':'color:blue')
   }
   else if(d.cmd=='files')
   {
-    a.path.innerHTML='CD '+path
+    a.path.innerHTML=path
     d.list.sort(function(a1, b1) {
       n=a1[0].toLowerCase().localeCompare(b1[0].toLowerCase())
       if(a1[2]) n-=10
@@ -930,11 +840,12 @@ function cd(p)
     pathParts=path.split('/')
     pathParts.pop()
     path=pathParts.join('/')
+    if(path=='') path='/'
   }else{
-    if(path.length) path+='/'
+    if(path.length>1) path+='/'
     path+=p
   }
-  setVar('cd', '/'+path)
+  setVar('cd', path)
 }
 
 function delfile(idx,name)
@@ -946,10 +857,10 @@ function delfile(idx,name)
 
 function fullName(name)
 {
-  if(path) name='/'+path+'/'+name
-  return '/'+name
+  if(path.length>1) return path+'/'+name
+  else return '/'+name
 }
-function download(name) {
+function download(name){
   const b = document.createElement('a')
   b.href=encodeURIComponent(fullName(name))
   b.download = name
@@ -979,16 +890,15 @@ input{
 </head>
 <body bgcolor="silver">
 <table>
-<tr><td><input type=button value="Internal" onClick="setVar('setfs','int');">
+<tr><td><input id="int" type=button value="Internal" onClick="setVar('setfs','int');">
 <input id=sdcard disabled type=button value="SD Card" onClick="setVar('setfs','SD');">
 </td>
-</tr>
-<tr><td>
-<p align="left" id="free">Internal: 0K Free</p>
-<p align="left" id="path">CD </p>
+<td id="free">0K Free</td></tr>
+<tr>
+<td id="path" colspan="2">
 </td></tr>
 <tr>
-<td>
+<td colspan="2">
 <div id="dropContainer">
 <table style="font-size:small" id="fileList">
 <tr><td>Drop Files Here</td></tr>
@@ -1006,25 +916,26 @@ dropContainer.ondragover = dropContainer.ondragenter = function(ev){ev.preventDe
 dropContainer.ondragend = dropContainer.ondraleave = function(ev){ev.preventDefault()}
 
 dropContainer.ondrop = function(evt) {
-  data=evt.dataTransfer.files[0]
-  evt.preventDefault()
-  item=evt.dataTransfer.items[0].webkitGetAsEntry()
-  it=new Array()
-  it[0]=data.name
-  it[1]=0
-  it[2]=0
-  if(item.isDirectory)
-  {
+  for(i=0;i<evt.dataTransfer.files.length;i++){
+   data=evt.dataTransfer.files[i]
+   evt.preventDefault()
+   item=evt.dataTransfer.items[i].webkitGetAsEntry()
+   it=new Array()
+   it[0]=data.name
+   if(item.isDirectory){
+    it[1]=0
     it[2]=1
     setVar('createdir','"'+fullName(data.name)+'"')
     AddFile(it)
-    return
+   }else{
+    it[1]=data.size
+    it[2]=0
+    formData = new FormData()
+    formData.append(data.name,data,fullName(data.name))
+    fetch('/upload', {method: 'POST', body: formData})
+    AddFile(it)
+   }
   }
-  it[1]=data.size
-  formData = new FormData()
-  formData.append(data.name,data,fullName(data.name))
-  fetch('/upload', {method: 'POST', body: formData})
-  AddFile(it)
 }
 </script>
 </html>
