@@ -20,7 +20,7 @@ void TempArray::add()
   m_log[iPos].temp = wb.m_currentTemp;
   m_log[iPos].state = wb.m_bHeater;
 #ifdef RADAR_H
-  m_log[iPos].state |= (radar.m_bInBed << 1) | (radar.m_bPresence << 2);
+  m_log[iPos].state |= (radar.nZone << 1);
 #endif
   m_log[iPos].rm = ths.m_temp;
   m_log[iPos].rh = ths.m_rh;
@@ -108,7 +108,7 @@ void TempArray::draw(int16_t xPos, int16_t yPos, uint16_t w, uint16_t h)
   }
 
   mn /= 10; mn *= 10; // floor
-  mx += (10-(mx%10)); // ciel
+  mx += (10 - (mx % 10)); // ciel
   sprite.setTextColor(TFT_CYAN, TFT_BLACK);
   sprite.setFreeFont(&FreeSans7pt7b);
   sprite.drawString( String(mx / 10), xPos + w + 10, yPos + 10 ); // draw min/max no dec
@@ -151,7 +151,7 @@ void TempArray::draw(int16_t xPos, int16_t yPos, uint16_t w, uint16_t h)
 
     x2 = tm2x(m_log[iPos].min, w) + xPos;
     y2 = t2y(m_log[iPos].rm, h) + yPos;
-    if(i)
+    if(i && x > x2) // skip the rollover
       sprite.drawLine(x, y, x2, y2, TFT_BLUE);
     x = x2;
     y = y2;
@@ -171,10 +171,9 @@ void TempArray::draw(int16_t xPos, int16_t yPos, uint16_t w, uint16_t h)
       break;
 
     x2 = tm2x(m_log[iPos].min, w) + xPos;
-
     y2 = (h - (m_log[iPos].rh * h)) / 100 + yPos;
-    if(i)
-      sprite.drawLine(x, y, x2, y2, TFT_BLUE);
+    if(i && x > x2)
+      sprite.drawLine(x, y, x2, y2, TFT_GREEN);
     x = x2;
     y = y2;
   }
@@ -194,7 +193,7 @@ void TempArray::draw(int16_t xPos, int16_t yPos, uint16_t w, uint16_t h)
 
     x2 = tm2x(m_log[iPos].min, w) + xPos;
     y2 = t2y(m_log[iPos].temp, h) + yPos;
-    if(i)
+    if(i && x > x2)
       sprite.drawLine(x, y, x2, y2, (m_log[iPos].state&1) ? TFT_RED : TFT_LIGHTGREY);
     x = x2;
     y = y2;
