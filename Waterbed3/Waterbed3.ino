@@ -25,7 +25,7 @@ SOFTWARE.
 //  ESP32: (2.0.14) ESP32S3 Dev Module, QIO, CPU Freq: 240MHz for mp3 playback
 //  Flash: 16MB
 //  Partition: 8M with SPIFFS or 16 MB with FatFS (change INTERNAL_FS in Media.h to match)
-//  PSRAM: QPI PSRAM
+//  PSRAM: OPI PSRAM
 //  In TFT_eSPI/User_Setup_Select.h use #include <User_Setups/Setup303_Waveshare_ESP32S3_ST7789.h> (custom, included in repo)
 
 #include <WiFi.h>
@@ -67,7 +67,7 @@ Radar radar;
 #endif
 
 Lights lights;
-const char *hostName = "Waterbed"; // Device and OTA name
+const char *hostName = "WaterbedM"; // Device and OTA name
 
 bool bConfigDone = false; // EspTouch done or creds set
 bool bStarted = false; // first start
@@ -185,6 +185,7 @@ const char *jsonListCmd[] = {
   "cd",
   "delf",
   "createdir",
+  "radarpts",
   NULL
 };
 
@@ -339,6 +340,23 @@ void jsonCallback(int16_t iName, int iValue, char *psValue)
       media.createDir(psValue);
       ws.textAll(setupJson()); // update disk free
       break;
+    case 34: // radarpts
+      parseRadarPoints(psValue);
+      break;
+  }
+}
+
+void parseRadarPoints(char *p)
+{
+  char *token = strtok(p, ",");
+
+  for(uint8_t n = 0; token && n < 4; n++)
+  {
+    ee.radarPts[n][0] = atoi(token);
+    token = strtok(NULL, ",");
+    if(token)
+      ee.radarPts[n][1] = atoi(token);
+    token = strtok(NULL, ",");
   }
 }
 
@@ -496,12 +514,13 @@ String dataJson()
   js.Var("rh",   String((float)ths.m_rh / 10, 1) );
   js.Var("c",    String((ee.bCF) ? "C" : "F"));
 #ifdef RADAR_H
-  js.Var("mot",  radar.m_bPresence);
-#else
-  js.Var("mot",  0);
+  js.Var("zone", radar.nZone);
+  js.Var("dist", radar.nDistance);
+  js.Var("ener", radar.nEnergy);
 #endif
   js.Var("eta",  wb.nHeatETA);
   js.Var("cooleta",  wb.nCoolETA);
+
   return js.Close();
 }
 
@@ -545,6 +564,7 @@ String setupJson()
   js.Var("diskfree",  media.freeSpace() );
   js.Var("sdavail",  media.SDCardAvailable() );
   js.Var("currfs", media.currFS());
+  js.ArrayPts("radarpts", ee.radarPts, 4);
   return js.Close();
 }
 
@@ -646,7 +666,7 @@ void loop()
 
         if ( mon_save != month() )
         {
-          if (mon_save >= 0) // restart check
+          if (mon_save >= 0 && year() > 2020) // restart check
             ee.tSecsMon[month() - 1] = 0;
           mon_save = month();
         }
