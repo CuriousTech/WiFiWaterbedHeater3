@@ -18,4 +18,7 @@ The web page. Same as previous, but allows drag and drop files over the lower fi
   
 ![Web](http://curioustech.net/images/wb3web.png)  
 
+The new zone editor added  
+![radar](http://curioustech.net/images/wb3rdr.jpg)  
+  
 Building: The ino explains the common settings for the IDE like my other projects. I use the Windows Store version because it works best for me. If a library is missing, the error should show a line with a link to where to get it. If not, complain.  
