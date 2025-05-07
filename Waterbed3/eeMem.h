@@ -127,8 +127,9 @@ public:
   uint32_t tSecsMon[12] = {1254411,1067144,916519,850686,122453,268488,302535,396531,501161,552347,427980,883172}; // total secwatt hours per month (copied from page)
   int16_t  tAdj[2] = {0,0};
   int16_t  pids[3] = {60*3,60*1, 5}; // Todo: real PID
+  int16_t  radarPts[4][2] = {-400,100, 400,100, 400,1500, -400,1500};
 
-  uint8_t  reserved[50];           // Note: To force an EEPROM update, just subtract 1 byte and flash again
+  uint8_t  reserved[34];           // Note: To force an EEPROM update, just subtract 1 byte and flash again
   uint8_t  end;
 };
 
