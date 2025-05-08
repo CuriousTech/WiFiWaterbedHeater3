@@ -16,9 +16,6 @@ The slave board and 3D files from the WB2 project is reposted here as well.
   
 The web page. Same as previous, but allows drag and drop files over the lower file display areas. The internal files are only used for click and notifications sounds so far. It's just easier than setting up to upload the FFat.  Although SPIFFS or LittleFS can be used instead very easily. The SD card is used for the MP3 player.  
   
-![Web](http://curioustech.net/images/wb3web.png)  
-
-The new zone editor added  
-![radar](http://curioustech.net/images/wb3rdr.jpg)  
+![Web](http://curioustech.net/images/wb3web2.png)  
   
 Building: The ino explains the common settings for the IDE like my other projects. I use the Windows Store version because it works best for me. If a library is missing, the error should show a line with a link to where to get it. If not, complain.  
