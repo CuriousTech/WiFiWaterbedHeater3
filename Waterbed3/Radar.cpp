@@ -5,6 +5,7 @@
 #include "jsonString.h"
 #include <TimeLib.h>
 #include "Lights.h"
+#include "eeMem.h"
 
 #define RADAR_SERIAL Serial
 
@@ -42,9 +43,6 @@ void Radar::init()
 
 void Radar::service()
 {
-//  if(radarConnected == false)
-//    return;
-
   static bool bLastPres;
   m_bPresence = read();
 
@@ -111,8 +109,10 @@ bool Radar::read()
       for (int i = 0; i < 3; i++)
       {
         if (radTgt[i].x & 0x8000)
-          radTgt[i].x = -(radTgt[i].x & 0x7FFF);
-        radTgt[i].y &= 0x7FFF; // not even signed really
+          radTgt[i].x = -(radTgt[i].x & 0x7FFF); // little-endien, but odd sign bit 0x8001 = -1 instead of 0xFFFF
+        if( (radTgt[i].y & 0x8000) == 0) // potentially behind radar, ignore
+          radTgt[i].resolution = 0;
+        radTgt[i].y &= 0x7FFF; // always signed in positive direction
         if (radTgt[i].speed & 0x8000)
           radTgt[i].speed = -(radTgt[i].speed & 0x7FFF);
       }
@@ -128,13 +128,16 @@ bool Radar::read()
   {
     if(radTgt[i].resolution)
     {
-      nDistance = radTgt[i].y; //sqrt(pow(radTgt[i].x, 2) +  pow(radTgt[i].y, 2));
-      bRes = true;
+      if(blindCheck(radTgt[i].x, radTgt[i].y))
+      {
+        nDistance = radTgt[i].y; //sqrt(pow(radTgt[i].x, 2) +  pow(radTgt[i].y, 2)); // actual distance (stolen from a lib on the net)
+        bRes = true;
+      }
     }
   }
 
   static uint32_t lastSent = 0;
-  if( millis() - lastSent > 499) // 2 Hz
+  if( millis() - lastSent > 250) // 4 Hz
   {
     lastSent = millis();
 
@@ -176,11 +179,11 @@ bool Radar::read()
   if(nNewZone == nZone) // no change
     return bPresence;
 
-   // give it time to settle
+   // Delay changing zones. If too fast, increase
   if(nZoneCnt < 200)
     nZoneCnt++;
 
-  if(nZoneCnt < 8)
+  if(nZoneCnt < 8) // 8 may feel too fast, 16 is about 1 second
   {
     return bPresence;
   }
@@ -233,6 +236,17 @@ bool Radar::read()
     display.m_backlightTimer = ee.sleepTime; // keep display on with lights
 
   return bPresence;
+}
+
+bool Radar::blindCheck(int32_t x, int32_t y)
+{
+  if(x >= ee.bound/2 || x <= -(ee.bound/2) || y >= ee.bound) // outside detection bounds (visible area on page)
+    return false;
+
+  x = constrain( (x + (ee.bound/2)) * 32 / ee.bound, 0, 31);
+  y = constrain( y * 32 / ee.bound, 0, 31);
+
+  return !(ee.blindBits[y] & (1 << x));
 }
 
 #else // LD2410
