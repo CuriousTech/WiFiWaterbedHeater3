@@ -28,7 +28,7 @@ background: linear-gradient(0deg, rgba(200,190,200,1) 0%, rgba(120,120,120,1) 10
 background-clip: padding-box;
 }
 
-body{width:300px;display:block;margin-left:auto;margin-right:auto;text-align:right;font-family: Arial, Helvetica, sans-serif;}}
+body{width:320px;display:block;margin-left:auto;margin-right:auto;text-align:right;font-family: Arial, Helvetica, sans-serif;}
 </style>
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js" type="text/javascript" charset="utf-8"></script>
 <script type="text/javascript">
@@ -38,21 +38,15 @@ cnt=1
 eco=0
 debug=false
 cf='F'
-pause=0
-zoom=1
-min2=0
-max2=300
-dispIdx=0
-mod=5
-btn=0
-zoom=18
 ballrad=6
 va=new Array()
+set=true
 
-colors=['#f0F','#0F0','#FF0']
+colors=['#F0F','#0F0','#FF0']
 
 function openSocket(){
 initradar()
+setclr(true)
 ws=new WebSocket("ws://"+window.location.host+"/ws")
 //ws=new WebSocket("ws://192.168.31.8/ws")
 ws.onopen=function(evt){}
@@ -89,7 +83,10 @@ ws.onmessage=function(evt){
   schedCnt=d.cnt
   setSeason(d.season)
   draw_bars(d.ts,d.ppkwm)
-  bedpoints=d.radarpts
+  zonepoints=d.radarpts
+  blindbits=d.blindbits
+  bound=+d.bound
+  a.bound.value=bound
  }
  else if(d.cmd=='tdata')
  {
@@ -152,29 +149,31 @@ function setVar(varName, value)
  ws.send('{"key":"'+a.myKey.value+'","'+varName+'":'+value+'}')
 }
 function setavg(){avg=!avg
-setVar('avg',avg?1:0)
-draw()
+ setVar('avg',avg?1:0)
+ draw()
 }
 function setTemp(n){
-setVar('tadj',n)
+ setVar('tadj',n)
 }
 function setAllTemp(n){
-setVar('aadj',n)
+ setVar('aadj',n)
 }
 function setEco(n){
-eco=!eco
-setVar('eco',eco?1:0)
+ eco=!eco
+ setVar('eco',eco?1:0)
 }
 function setVaca(){
-setVar('vacatemp',a.vt.value)
-setVar('vaca',(a.vo.value=='OFF')?true:false)
+ setVar('vacatemp',a.vt.value)
+ vaca=(a.vo.value=='OFF')?true:false
+ setVar('vaca',vaca)
+ a.vo.value=vaca?'ON ':'OFF'
 }
 function setCnt(n){
-cnt+=n
-setVar('cnt',cnt)
+ cnt+=n
+ setVar('cnt',cnt)
 }
 function setPPK(){
-setVar('ppkwh',(a.K.value*1000).toFixed())
+ setVar('ppkwh',(a.K.value*1000).toFixed())
 }
 
 var x,y,llh=0,llh2=0
@@ -530,43 +529,37 @@ function initradar()
     mouseY=e.clientY-rect.y
     if(hit)
     {
-        bedpoints[select][0]=(mouseX-(c.width/2))*zoom
-        bedpoints[select][1]=mouseY*zoom
+        zonepoints[select][0]=(mouseX-(c.width/2))*bound/c.width
+        zonepoints[select][1]=mouseY*bound/c.height
         switch(select){
             case 0:
-              if(bedpoints[0][0] >= bedpoints[1][0]) bedpoints[0][0] = bedpoints[1][0]-1
-              if(bedpoints[0][1] >= bedpoints[3][1]) bedpoints[0][1] = bedpoints[3][1]-1
-              if(bedpoints[0][1] >= bedpoints[2][1]) bedpoints[0][1] = bedpoints[2][1]-1
+              if(zonepoints[0][0] >= zonepoints[1][0]) zonepoints[0][0] = zonepoints[1][0]-1
+              if(zonepoints[0][1] >= zonepoints[3][1]) zonepoints[0][1] = zonepoints[3][1]-1
+              if(zonepoints[0][1] >= zonepoints[2][1]) zonepoints[0][1] = zonepoints[2][1]-1
               break
             case 1:
-              if(bedpoints[1][0] <= bedpoints[0][0]) bedpoints[1][0] = bedpoints[0][0]+1
-              if(bedpoints[1][1] >= bedpoints[2][1]) bedpoints[1][1] = bedpoints[2][1]-1
+              if(zonepoints[1][0] <= zonepoints[0][0]) zonepoints[1][0] = zonepoints[0][0]+1
+              if(zonepoints[1][1] >= zonepoints[2][1]) zonepoints[1][1] = zonepoints[2][1]-1
               break
             case 2:
-              if(bedpoints[2][0] <= bedpoints[3][0]) bedpoints[2][0] = bedpoints[3][0]+1
-              if(bedpoints[2][0] <= bedpoints[0][0]) bedpoints[2][0] = bedpoints[0][0]+1
-              if(bedpoints[2][1] <= bedpoints[1][1]) bedpoints[2][1] = bedpoints[1][1]+1
+              if(zonepoints[2][0] <= zonepoints[3][0]) zonepoints[2][0] = zonepoints[3][0]+1
+              if(zonepoints[2][0] <= zonepoints[0][0]) zonepoints[2][0] = zonepoints[0][0]+1
+              if(zonepoints[2][1] <= zonepoints[1][1]) zonepoints[2][1] = zonepoints[1][1]+1
               break
             case 3:
-              if(bedpoints[3][0] >= bedpoints[2][0]) bedpoints[3][0] = bedpoints[2][0]-1
-              if(bedpoints[3][1] <= bedpoints[0][1]) bedpoints[3][1] = bedpoints[0][1]+1
+              if(zonepoints[3][0] >= zonepoints[2][0]) zonepoints[3][0] = zonepoints[2][0]-1
+              if(zonepoints[3][1] <= zonepoints[0][1]) zonepoints[3][1] = zonepoints[0][1]+1
               break
         }
       }
       else if(mouseDown)
       {
-        x=(mouseX-(c.width/2))*zoom
-        y=mouseY*zoom
-        z=0
-        xL=(bedpoints[3][0]-bedpoints[0][0]) * (y-bedpoints[0][0]) / (bedpoints[3][1]-bedpoints[0][1]) + bedpoints[0][0]
-        xR=(bedpoints[2][0]-bedpoints[1][0]) * (y-bedpoints[1][0]) / (bedpoints[2][1]-bedpoints[1][1]) + bedpoints[1][0]
-        yT=(bedpoints[1][1]-bedpoints[0][1]) * (x-bedpoints[0][1]) / (bedpoints[1][0]-bedpoints[0][0]) + bedpoints[1][1]
-        yB=(bedpoints[2][1]-bedpoints[3][1]) * (x-bedpoints[3][1]) / (bedpoints[2][0]-bedpoints[3][0]) + bedpoints[2][1]
-
-        if(x>=xL&&x<=xR&&y>=yT&&y<=yB)
-          z=1
-        testdraw(x,y,z)
-      }
+        if(!hit){
+         n=(32*mouseY/c.height).toFixed()
+         b=(32*mouseX/c.width).toFixed()
+         togglebit(n,b)
+        }
+    }
   })
   radar.mousedown(function(e){
     rect=c.getBoundingClientRect()
@@ -574,60 +567,63 @@ function initradar()
     mouseY=e.clientY-rect.y
     mouseDown=true
     for(i=0;i<4;i++){
-      x = c.width/2+bedpoints[i][0]/zoom
-      y = bedpoints[i][1]/zoom
+      x = c.width/2+zonepoints[i][0]/(bound/c.width)
+      y = zonepoints[i][1]/(bound/c.height)
       if(mouseX<x+ballrad&&mouseX>x-ballrad&&mouseY<y+ballrad&&mouseY>y-ballrad){
        hit=true
        select=i
       }
     }
+    if(!hit){
+      n=(32*mouseY/c.height).toFixed()
+      b=(32*mouseX/c.width).toFixed()
+      togglebit(n,b)
+    }
   })
   radar.mouseup(function(e){
     mouseDown=false
     hit=false
-    setVar('radarpts','"'+bedpoints.join(',')+'"')
+    setVar('radarpts','"'+zonepoints.join(',')+'"')
+    setVar('blindbits','"'+blindbits.join(',')+'"')
   })
 }
 
-function testdraw(x,y,zone)
+function togglebit(n,bit)
 {
-  try {
-  var c=document.getElementById('radar')
-  ctx=c.getContext("2d")
-  ctx.fillStyle=colors[zone]
-  ctx.beginPath()
-  x=c.width/2+x/zoom
-  ctx.ellipse(x, y/zoom, ballrad-3, ballrad-3, 0, 0, Math.PI*2)
-  ctx.fill()
-}catch(err){}
+  if(set) blindbits[n]|=(1<<bit)
+  else blindbits[n]&=~(1<<bit)
+  draw_radar(0,0,0,0)
 }
 
-function draw_radar(x,y,pres,zone){
-try {
+function draw_radar(xPos,yPos,pres,zone){
+ try {
   var c=document.getElementById('radar')
   ctx=c.getContext("2d")
-  ctx.fillStyle="#222"
-  ctx.fillRect(0,0,c.width,c.height)
+  szw=c.width/32
+  szh=c.height/32
+  for(i=0;i<32;i++)
+  {
+    for(i2=0;i2<32;i2++)
+    {
+      x=i2*szw
+      y=i*szh
+      ctx.fillStyle=((blindbits[i]>>i2)&1) ? '#444' : '#010'
+      ctx.fillRect(x,y,szw,szh)
+    }
+  }
   ctx.fillStyle="#FFF"
   ctx.lineWidth=1
-  ctx.font="bold 10px sans-serif"
+  ctx.font="bold 12px sans-serif"
   ctx.textAlign="right"
-  ctx.fillText('X='+x,40,10)
-  ctx.fillText('Y='+y,80,10)
-  ctx.fillText('Zone='+zone,c.width-10,10)
-  if(pres){
-    ctx.fillStyle=colors[zone]
-    ctx.beginPath()
-    x=c.width/2+x/zoom
-    ctx.ellipse(x, y/zoom, ballrad+3, ballrad+3, 0, 0, Math.PI*2)
-    ctx.fill()
-  }
+  ctx.fillText('X='+xPos,50,c.height-9)
+  ctx.fillText('Y='+yPos,130,c.height-9)
+  ctx.fillText('Zone='+zone,c.width-10,c.height-9)
   ctx.fillStyle="blue"
   for(i=0;i<4;i++)
   {
     ctx.beginPath()
-    x=c.width/2+bedpoints[i][0]/zoom
-    y=bedpoints[i][1]/zoom
+    x=c.width/2+zonepoints[i][0]/(bound/c.width)
+    y=zonepoints[i][1]/(bound/c.height)
     ctx.ellipse(x, y, ballrad, ballrad, 0, 0, Math.PI*2)
     ctx.fill()
   }
@@ -635,16 +631,41 @@ try {
   ctx.beginPath()
   for(i=0;i<4;i++)
   {
-    x=c.width/2+bedpoints[i][0]/zoom
-    y=bedpoints[i][1]/zoom
+    x=c.width/2+zonepoints[i][0]/(bound/c.width)
+    y=zonepoints[i][1]/(bound/c.height)
     if(i==0) ctx.moveTo(x,y)
     else ctx.lineTo(x,y)
   }
-  x=c.width/2+bedpoints[0][0]/zoom
-  y=bedpoints[0][1]/zoom
+  x=c.width/2+zonepoints[0][0]/(bound/c.width)
+  y=zonepoints[0][1]/(bound/c.height)
   ctx.lineTo(x,y)
   ctx.stroke()
-}catch(err){}
+  if(pres){
+    ctx.fillStyle=colors[zone]
+    ctx.beginPath()
+    x=c.width/2+xPos/(bound/c.width)
+    ctx.ellipse(x, yPos/(bound/c.height), ballrad+3, ballrad+3, 0, 0, Math.PI*2)
+    ctx.fill()
+  }
+ 
+ }catch(err){}
+}
+
+function setclr(sc)
+{
+  set=sc
+  a.bset.setAttribute('style',(set)?'color:red':'none')
+  a.bclr.setAttribute('style',(set)?'none':'color:red')
+}
+function erase()
+{
+ blindbits=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+ setVar('blindbits','"'+blindbits.join(',')+'"')
+}
+function setbound(val)
+{
+  bound=val
+  setVar('bound',bound)
 }
 </script>
 <style type="text/css">
@@ -684,7 +705,7 @@ openSocket()
 <td>Avg: <input type="button" value="OFF" id="AVG" onClick="{setavg()}"></td></tr>
 <tr><td colspan=2>Vacation <input id='vt' type=text size=2 value='-10'><input type='button' id='vo' onclick="{setVaca()}"> &nbsp &nbsp </td>
 <td>Eco: <input type="button" value="OFF" id="eco" onClick="{setEco()}"></td></tr>
-<tr><td>Schedule <input id='inc' type='button' onclick="{setCnt(1)}"><br/>Count <input id='dec' type='button' onclick="{setCnt(-1)}"}></td>
+<tr><td>Schedule <input id='inc' type='button' onclick="{setCnt(1)}"><br/>Count <input id='dec' type='button' onclick="{setCnt(-1)}"></td>
 <td> Temperature<br>Adjust</td>
 <td><input type='button' value='Up' onclick="{setTemp(1)}"> <input type='button' value='All Up' onclick="{setAllTemp(1)}"><br><input type='button' value='Dn' onclick="{setTemp(-1)}"> <input type='button' value='All Dn' onclick="{setAllTemp(-1)}"></td></tr>
 <tr>
@@ -697,18 +718,19 @@ openSocket()
 <tr><td></td><td colspan=2 id='r5' style="display:none"><input id=S5 type=text size=3> <input id=T5 type=text size=3> <input id=H5 type=text size=2></td></tr>
 <tr><td></td><td colspan=2 id='r6' style="display:none"><input id=S6 type=text size=3> <input id=T6 type=text size=3> <input id=H6 type=text size=2></td></tr>
 <tr><td></td><td colspan=2 id='r7' style="display:none"><input id=S7 type=text size=3> <input id=T7 type=text size=3> <input id=H7 type=text size=2></td></tr>
-<tr><td colspan=3><canvas id="canva" width="300" height="150" style="float:center" onclick="draw() /"></td></tr>
+<tr><td colspan=3><canvas id="canva" width="320" height="150" style="float:center" onclick="draw()"></td></tr>
 <tr><td colspan=3>
 <div id="wrapper">
-<canvas id="graph" width="300" height="100" />
-<div id="popup"><canvas id="tip" width="70" height="48" /></div>
+<canvas id="graph" width="320" height="100">
+<div id="popup"><canvas id="tip" width="70" height="48"></div>
 </div>
 </td></tr>
 <tr><td colspan=2 align="left">PPKWH $<input id='K' type=text size=2 value='0.1597' onchange="{setPPK()}">
  </td><td> <input id="myKey" name="key" type=text size=40 placeholder="password" style="width: 100px" onChange="{localStorage.setItem('key', key = document.all.myKey.value)}"></td></tr>
- <tr><td colspan=2></td><td><input type="submit" value="File Manager" onClick="window.location='/fm.html';"></td>
+ <tr><td><input value='SET' id='bset' type='button' onclick="{setclr(true)}"><input value='CLR' id='bclr' type='button' onclick="{setclr(false)}"></td>
+ <td><input value='ERASE' type='button' onclick="{erase()}"><input id='bound' type=text size=1 value='6000' onchange="{setbound(this.value)}"></td><td><input type="submit" value="File Manager" onClick="window.location='/fm.html';"></td>
  </tr>
-<tr><td colspan=3><canvas id="radar" width="300" height="300" style="float:center" /"></td></tr>
+<tr><td colspan=3><canvas id="radar" width="320" height="320" style="float:center"></td></tr>
 </table>
 </body>
 </html>
