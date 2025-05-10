@@ -186,6 +186,8 @@ const char *jsonListCmd[] = {
   "delf",
   "createdir",
   "radarpts",
+  "blindbits",
+  "bound",
   NULL
 };
 
@@ -343,6 +345,12 @@ void jsonCallback(int16_t iName, int iValue, char *psValue)
     case 34: // radarpts
       parseRadarPoints(psValue);
       break;
+    case 35: // blindbits
+      parseBlindbits(psValue);
+      break;
+    case 36: // bound
+      ee.bound = constrain(iValue, 1000, 12000);
+      break;
   }
 }
 
@@ -356,6 +364,17 @@ void parseRadarPoints(char *p)
     token = strtok(NULL, ",");
     if(token)
       ee.radarPts[n][1] = atoi(token);
+    token = strtok(NULL, ",");
+  }
+}
+
+void parseBlindbits(char *p)
+{
+  char *token = strtok(p, ",");
+
+  for(uint8_t n = 0; token && n < 32; n++)
+  {
+    ee.blindBits[n] = atoi(token);
     token = strtok(NULL, ",");
   }
 }
@@ -565,6 +584,8 @@ String setupJson()
   js.Var("sdavail",  media.SDCardAvailable() );
   js.Var("currfs", media.currFS());
   js.ArrayPts("radarpts", ee.radarPts, 4);
+  js.Array("blindbits", ee.blindBits, 32);
+  js.Var("bound", ee.bound);
   return js.Close();
 }
 
