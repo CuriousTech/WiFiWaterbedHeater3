@@ -8,11 +8,12 @@
 #define LD2450
 #define LD2450_BUFFER_SIZE (10*30)
 
+// LD2450 data
 struct RadarTarget
 {
-  int16_t x;           // X mm
-  int16_t y;           // Y mm
-  int16_t speed;       // cm/s
+  int16_t x;           // X mm (signed X angle)
+  int16_t y;           // Y mm (Y pos, just remove sign)
+  int16_t speed;       // cm/s (signed)
   uint16_t resolution; // mm
 };
 
@@ -31,9 +32,9 @@ public:
   uint8_t bits;
   int16_t nDistance = 400; // start out of zones
   uint16_t nEnergy;
-
 private:
 #ifdef LD2450
+  bool blindCheck(int32_t x, int32_t y);
   RadarTarget radTgt[3];
   uint8_t circular_buffer[LD2450_BUFFER_SIZE];
   uint16_t buffer_head = 0;
