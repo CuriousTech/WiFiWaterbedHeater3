@@ -150,23 +150,36 @@ bool Radar::read()
     WsSend(js.Close());
   }
 
-  int16_t xL=(ee.radarPts[3][0]-ee.radarPts[0][0]) * (radTgt[0].y-ee.radarPts[0][0]) / (ee.radarPts[3][1]-ee.radarPts[0][1]) + ee.radarPts[0][0]; // Issue: negatives
-  int16_t xR=(ee.radarPts[2][0]-ee.radarPts[1][0]) * (radTgt[0].y-ee.radarPts[1][0]) / (ee.radarPts[2][1]-ee.radarPts[1][1]) + ee.radarPts[1][0];
-  int16_t yT=(ee.radarPts[1][1]-ee.radarPts[0][1]) * (radTgt[0].x-ee.radarPts[0][1]) / (ee.radarPts[1][0]-ee.radarPts[0][0]) + ee.radarPts[1][1];
-  int16_t yB=(ee.radarPts[2][1]-ee.radarPts[3][1]) * (radTgt[0].x-ee.radarPts[3][1]) / (ee.radarPts[2][0]-ee.radarPts[3][0]) + ee.radarPts[2][1];
+  int32_t rect0[4];
+  int32_t rect1[4];
 
-  if( radTgt[0].x >= xL && radTgt[0].x <= xR && radTgt[0].y >= yT && radTgt[0].y <= yB)
+  rect0[0] = (ee.radarPts[3][0]-ee.radarPts[0][0]) * (radTgt[0].y-ee.radarPts[0][1]) / (ee.radarPts[3][1]-ee.radarPts[0][1]) + ee.radarPts[0][0];
+  rect0[1] = (ee.radarPts[1][1]-ee.radarPts[0][1]) * (radTgt[0].x-ee.radarPts[0][0]) / (ee.radarPts[1][0]-ee.radarPts[0][0]) + ee.radarPts[0][1];
+  rect0[2] = (ee.radarPts[2][0]-ee.radarPts[1][0]) * (radTgt[0].y-ee.radarPts[1][1]) / (ee.radarPts[2][1]-ee.radarPts[1][1]) + ee.radarPts[1][0];
+  rect0[3] = (ee.radarPts[2][1]-ee.radarPts[3][1]) * (radTgt[0].x-ee.radarPts[2][0]) / (ee.radarPts[2][0]-ee.radarPts[3][0]) + ee.radarPts[2][1];
+
+  rect1[0] = (ee.radarPts[7][0]-ee.radarPts[4][0]) * (radTgt[0].y-ee.radarPts[7][1]) / (ee.radarPts[7][1]-ee.radarPts[4][1]) + ee.radarPts[4][0];
+  rect1[1] = (ee.radarPts[5][1]-ee.radarPts[4][1]) * (radTgt[0].x-ee.radarPts[4][0]) / (ee.radarPts[5][0]-ee.radarPts[4][0]) + ee.radarPts[4][1];
+  rect1[2] = (ee.radarPts[6][0]-ee.radarPts[5][0]) * (radTgt[0].y-ee.radarPts[5][1]) / (ee.radarPts[6][1]-ee.radarPts[5][1]) + ee.radarPts[5][0];
+  rect1[3] = (ee.radarPts[6][1]-ee.radarPts[7][1]) * (radTgt[0].x-ee.radarPts[6][0]) / (ee.radarPts[6][0]-ee.radarPts[7][0]) + ee.radarPts[6][1];
+
+  if( radTgt[0].x >= rect0[0] && radTgt[0].x <= rect0[2] && radTgt[0].y >= rect0[1] && radTgt[0].y <= rect0[3])
   {
-    if(nNewZone != 0)
-      nZoneCnt = 0;
-
-    nNewZone = 0;
+    // latch zone
+    if( radTgt[0].x >= rect1[0] && radTgt[0].x <= rect1[2] && radTgt[0].y >= rect1[1] && radTgt[0].y <= rect1[3])
+    {
+      if(nNewZone != 0)
+        nZoneCnt = 0;
+      nNewZone = 0;
+    }
   }
   else if(bRes) // in room, out of zone
   {
     if(nNewZone != 1)
       nZoneCnt = 0;
     nNewZone = 1;
+    if(m_bLightOn)
+      display.m_backlightTimer = ee.sleepTime; // keep display on with lights
   }
   else
   {
@@ -195,6 +208,8 @@ bool Radar::read()
     case 0: // in bed
       bPresence = true;
       m_bInBed = true;
+      if(display.m_backlightTimer > 2)
+        display.m_backlightTimer = 2; // go dark fast
       if(m_bLightOn)
       {
         lights.clearQueue();
@@ -231,9 +246,6 @@ bool Radar::read()
       }
       break;
   }
-
-  if(m_bLightOn)
-    display.m_backlightTimer = ee.sleepTime; // keep display on with lights
 
   return bPresence;
 }
@@ -314,13 +326,6 @@ bool Radar::read()
   {
     if(nNewZone != 2)
     {
-/*      String s = "R";
-      for(uint8_t i = 0; i < 16; i++)
-      {
-        s += " ";
-        s += rads[i];
-      }
-      WsSend(s);*/
       nZoneCnt = 0;
     }
     nNewZone = 2;
