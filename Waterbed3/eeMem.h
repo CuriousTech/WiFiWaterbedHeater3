@@ -121,13 +121,14 @@ public:
       {830,  0*60, 3, 0}
     },
   };
-  uint16_t ppkwh = 159; // $0.154 / KWH
-  uint16_t rate = 50; // seconds
+  uint16_t ppkwh = 159; // $0.159 / KWH
+  uint16_t rate = 50; // update seconds
   uint16_t watts = 290; // Heating pad
-  uint32_t tSecsMon[12] = {1254411,1067144,916519,850686,122453,268488,302535,396531,501161,552347,427980,883172}; // total secwatt hours per month (chrome console)
+  uint32_t tSecsMon[12] = {1254411,1067144,916519,850686,122453,268488,302535,396531,501161,552347,427980,883172}; // total secwatt hours per month (watch chrome console)
   int16_t  tAdj[2] = {0,0};
   int16_t  pids[3] = {60*3,60*1, 5}; // Todo: real PID
-  int16_t  radarPts[4][2] = {{-1450,107}, {812,133}, {593,2258}, {-1575,1866}}; // bound box for zone 0
+  int16_t  radarPts[8][2] = {{-1450,107}, {562,133}, {593,2258}, {-1575,1866}, // bound box for zone 0
+                              {-1050,100}, {93,102}, {93,1008}, {-1093,852}}; // latch box for zone 0
   uint32_t blindBits[32]; // 32x32 editable blindspots
   uint16_t bound = 6000; // boundary in mm
   uint8_t  reserved[2];           // Note: To force an EEPROM update, just subtract 1 byte and flash again
