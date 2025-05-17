@@ -559,6 +559,23 @@ function initradar()
          b=(32*mouseX/c.width).toFixed()
          togglebit(n,b)
         }
+
+        x=((mouseX-(c.width/2)) *20).toFixed()
+        y=(mouseY * 20).toFixed()
+        z=2
+        xL=(zonepoints[3][0]-zonepoints[0][0]) * (y-zonepoints[0][1]) / (zonepoints[3][1]-zonepoints[0][1]) + zonepoints[0][0]
+        yT=(zonepoints[1][1]-zonepoints[0][1]) * (x-zonepoints[0][0]) / (zonepoints[1][0]-zonepoints[0][0]) + zonepoints[1][1]
+        xR=(zonepoints[2][0]-zonepoints[1][0]) * (y-zonepoints[1][1]) / (zonepoints[2][1]-zonepoints[1][1]) + zonepoints[1][0]
+        yB=(zonepoints[2][1]-zonepoints[3][1]) * (x-zonepoints[2][0]) / (zonepoints[2][0]-zonepoints[3][0]) + zonepoints[2][1]
+
+        xL2=(zonepoints[7][0]-zonepoints[4][0]) * (y-zonepoints[7][1]) / (zonepoints[7][1]-zonepoints[4][1]) + zonepoints[4][0]
+        yT2=(zonepoints[5][1]-zonepoints[4][1]) * (x-zonepoints[4][0]) / (zonepoints[5][0]-zonepoints[4][0]) + zonepoints[4][1]
+        xR2=(zonepoints[6][0]-zonepoints[5][0]) * (y-zonepoints[5][1]) / (zonepoints[6][1]-zonepoints[5][1]) + zonepoints[5][0]
+        yB2=(zonepoints[6][1]-zonepoints[7][1]) * (x-zonepoints[6][0]) / (zonepoints[6][0]-zonepoints[7][0]) + zonepoints[6][1]
+
+        if(x>=xL&&x<=xR&&y>=yT&&y<=yB) z=1
+        if(x>=xL2&&x<=xR2&&y>=yT2&&y<=yB2)z=0
+//        testdraw(x,y,z)
     }
   })
   radar.mousedown(function(e){
@@ -566,7 +583,7 @@ function initradar()
     mouseX=e.clientX-rect.x
     mouseY=e.clientY-rect.y
     mouseDown=true
-    for(i=0;i<4;i++){
+    for(i=0;i<8;i++){
       x = c.width/2+zonepoints[i][0]/(bound/c.width)
       y = zonepoints[i][1]/(bound/c.height)
       if(mouseX<x+ballrad&&mouseX>x-ballrad&&mouseY<y+ballrad&&mouseY>y-ballrad){
@@ -595,6 +612,20 @@ function togglebit(n,bit)
   draw_radar(0,0,0,0)
 }
 
+function testdraw(x,y,zone)
+{
+  try {
+  var c=document.getElementById('radar')
+  ctx=c.getContext("2d")
+  ctx.fillStyle=colors[zone]
+  ctx.beginPath()
+  x = c.width/2+x/(bound/c.width)
+  y = y/(bound/c.height)
+  ctx.ellipse(x, y, ballrad-3, ballrad-3, 0, 0, Math.PI*2)
+  ctx.fill()
+}catch(err){}
+}
+
 function draw_radar(xPos,yPos,pres,zone){
  try {
   var c=document.getElementById('radar')
@@ -619,7 +650,7 @@ function draw_radar(xPos,yPos,pres,zone){
   ctx.fillText('Y='+yPos,130,c.height-9)
   ctx.fillText('Zone='+zone,c.width-10,c.height-9)
   ctx.fillStyle="blue"
-  for(i=0;i<4;i++)
+  for(i=0;i<8;i++)
   {
     ctx.beginPath()
     x=c.width/2+zonepoints[i][0]/(bound/c.width)
@@ -638,6 +669,20 @@ function draw_radar(xPos,yPos,pres,zone){
   }
   x=c.width/2+zonepoints[0][0]/(bound/c.width)
   y=zonepoints[0][1]/(bound/c.height)
+  ctx.lineTo(x,y)
+  ctx.stroke()
+
+  ctx.strokeStyle='#DF4'
+  ctx.beginPath()
+  for(i=4;i<8;i++)
+  {
+    x=c.width/2+zonepoints[i][0]/(bound/c.width)
+    y=zonepoints[i][1]/(bound/c.height)
+    if(i==0) ctx.moveTo(x,y)
+    else ctx.lineTo(x,y)
+  }
+  x=c.width/2+zonepoints[4][0]/(bound/c.width)
+  y=zonepoints[4][1]/(bound/c.height)
   ctx.lineTo(x,y)
   ctx.stroke()
   if(pres){
@@ -776,11 +821,11 @@ function openSocket(){
   else if(d.cmd=='settings')
   {
     if(d.diskfree>1024*1024)
-      a.free.innerHTML=(d.diskfree/1024/1024).toFixed(1)+' MB Free'
+      a.free.innerHTML=(d.diskfree/1024/1024).toFixed(1)+' GB Free'
     else if(d.diskfree>10240)
-      a.free.innerHTML=(d.diskfree/1024).toFixed()+' KB Free'
+      a.free.innerHTML=(d.diskfree/1024).toFixed(1)+' MB Free'
     else
-      a.free.innerHTML=d.diskfree+' B Free'
+      a.free.innerHTML=d.diskfree+' KB Free'
     if(d.sdavail) a.sdcard.disabled=false
     sdcard=(d.currfs=='SDCard')
     a.sdcard.setAttribute('style',sdcard?'color:blue':'')
