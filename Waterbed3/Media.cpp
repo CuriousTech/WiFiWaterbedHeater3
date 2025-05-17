@@ -64,8 +64,6 @@ void Media::init()
   digitalWrite(SD_D3_PIN, HIGH); //enable
   vTaskDelay(pdMS_TO_TICKS(10));
 
-  INTERNAL_FS.begin(true);
-
   if (SD_MMC.begin("/sdcard", true, true) )
   {
     uint8_t cardType = SD_MMC.cardType();
@@ -79,6 +77,8 @@ void Media::init()
     strcpy(m_sdPath, "/"); // start with root
     setDirty();
   }
+
+  INTERNAL_FS.begin(true); // mount FFat after SD for correct free space
 }
 
 void Media::fillFileBButtons(Tile& pTile)
@@ -243,13 +243,14 @@ const char *Media::currFS()
 
 void Media::setFS(char *pszValue)
 {
-  m_bSDActive = !strcmp(pszValue, "SD"); // For now, just use SD
+  if(m_bCardIn)
+    m_bSDActive = !strcmp(pszValue, "SD"); // For now, just use SD
   setPath("/");
 }
 
 uint32_t Media::freeSpace()
 {
-  uint32_t nFree;
+  uint64_t nFree;
 
   if(m_bSDActive)
   {
@@ -260,7 +261,7 @@ uint32_t Media::freeSpace()
   {
     nFree = INTERNAL_FS.totalBytes() - INTERNAL_FS.usedBytes();
   }
-  return nFree;
+  return (uint32_t)(nFree >> 10);
 }
 
 void Media::setPath(char *szPath)
