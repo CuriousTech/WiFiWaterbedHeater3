@@ -41,7 +41,7 @@ SOFTWARE.
 #include <ESPmDNS.h>
 #include <ArduinoOTA.h>
 
-#include <ESPAsyncWebServer.h> // https://github.com/ESP32Async/ESPAsyncWebServer
+#include <ESPAsyncWebServer.h> // https://github.com/ESP32Async/ESPAsyncWebServer (3.7.2)
 #include <JsonParse.h> // https://github.com/CuriousTech/ESP-HVAC/tree/master/Libraries/JsonParse
 #include "jsonString.h"
 #include "pages.h"
@@ -358,7 +358,7 @@ void parseRadarPoints(char *p)
 {
   char *token = strtok(p, ",");
 
-  for(uint8_t n = 0; token && n < 4; n++)
+  for(uint8_t n = 0; token && n < 8; n++)
   {
     ee.radarPts[n][0] = atoi(token);
     token = strtok(NULL, ",");
@@ -583,7 +583,7 @@ String setupJson()
   js.Var("diskfree",  media.freeSpace() );
   js.Var("sdavail",  media.SDCardAvailable() );
   js.Var("currfs", media.currFS());
-  js.ArrayPts("radarpts", ee.radarPts, 4);
+  js.ArrayPts("radarpts", ee.radarPts, 8);
   js.Array("blindbits", ee.blindBits, 32);
   js.Var("bound", ee.bound);
   return js.Close();
