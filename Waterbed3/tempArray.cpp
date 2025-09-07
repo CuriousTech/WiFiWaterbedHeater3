@@ -2,21 +2,24 @@
 #include "tempArray.h"
 #include "eeMem.h"
 #include "jsonstring.h"
-#include <TimeLib.h>
+#include <time.h>
 #include <TFT_eSPI.h> // TFT_eSPI library from library manager?
 #include "WB.h"
 #include "THSensor.h"
 
 extern TFT_eSPI tft;
 extern TFT_eSprite sprite;
-
+extern tm gLTime;
 extern void consolePrint(String s);
 
 void TempArray::add()
 {
-  int iPos = hour() * 12 + minute() / 5;
+  if(!gLTime.tm_year < 124)
+    return;
 
-  m_log[iPos].min = (hour() * 60) + minute();
+  int iPos = gLTime.tm_hour * 12 + gLTime.tm_min / 5;
+
+  m_log[iPos].min = (gLTime.tm_hour * 60) + gLTime.tm_min;
   m_log[iPos].temp = wb.m_currentTemp;
   m_log[iPos].state = wb.m_bHeater;
 #ifdef RADAR_H
@@ -42,7 +45,7 @@ String TempArray::get()
     if(ent) s += ",";
     if(m_log[ent].state == 8) // now
     {
-      m_log[ent].min = (hour()*60) + minute();
+      m_log[ent].min = (gLTime.tm_hour*60) + gLTime.tm_min;
       m_log[ent].temp = wb.m_currentTemp;
       m_log[ent].rm = ths.m_temp;
       m_log[ent].rh = ths.m_rh;
@@ -79,6 +82,9 @@ uint16_t TempArray::tween(uint16_t t1, uint16_t t2, int m, int r)
 
 void TempArray::draw(int16_t xPos, int16_t yPos, uint16_t w, uint16_t h)
 {
+  if(gLTime.tm_year < 124)
+    return;
+
   mn = 1000; // get range
   mx = 0;
   for(uint8_t i = 0; i < ee.schedCnt[wb.m_season]; i++)
@@ -132,7 +138,7 @@ void TempArray::draw(int16_t xPos, int16_t yPos, uint16_t w, uint16_t h)
   }
   sprite.drawLine(x, y, xPos + w, yPos + t2y(ttl, h), TFT_ORANGE); // ending midnight point
 
-  int iPosStart = (hour() * 12 + minute() / 5) - 1;
+  int iPosStart = (gLTime.tm_hour * 12 + gLTime.tm_min / 5) - 1;
   if(iPosStart < 0) iPosStart = LOG_CNT-3;
   int iPos = iPosStart - 1;
   uint16_t i;
@@ -199,7 +205,7 @@ void TempArray::draw(int16_t xPos, int16_t yPos, uint16_t w, uint16_t h)
     y = y2;
   }
 
-  x = tm2x( hour() * 60 + minute(), w ) + xPos;
+  x = tm2x( gLTime.tm_hour * 60 + gLTime.tm_min, w ) + xPos;
   y = t2y(wb.m_currentTemp, h) + yPos;
   sprite.drawSpot(x, y, 3, TFT_GREEN); // current time/temp
 }
