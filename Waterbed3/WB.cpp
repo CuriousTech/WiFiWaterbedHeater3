@@ -1,11 +1,13 @@
 #include "WB.h"
-#include <TimeLib.h> // http://www.pjrc.com/teensy/td_libs_Time.html
+#include <time.h>
 #include "display.h"
 #include "eeMem.h"
 #include "RunningMedian.h"
 #include "TempArray.h"
 
 //#define SDEBUG
+
+extern tm gLTime;
 
 extern void consolePrint(String s);
 
@@ -46,7 +48,8 @@ void WB::setHeat()
 void WB::service() //  1 second
 {
   static bool bInit = false;
-  if(!bInit && year() > 2023)
+
+  if(!bInit && gLTime.tm_year > 124)
   {
     bInit = true;
     getSeason();
@@ -58,6 +61,7 @@ void WB::service() //  1 second
   static RunningMedian<uint32_t, 8> coolTimeMedian;
   static uint8_t state;
   static uint8_t nErrCnt;
+  static uint8_t nWarnCnt;
   static uint32_t onCounter;
 
   switch (state)
@@ -85,10 +89,15 @@ void WB::service() //  1 second
 
   if (!present)     // safety
   {
-    m_bHeater = false;
-    setHeat();
-    consolePrint("DS18 not present");
-    display.Notify("WARNING\nDS18 not detected", ip);
+    if(nWarnCnt == 0)
+    {
+      m_bHeater = false;
+      setHeat();
+      consolePrint("DS18 not present");
+      display.Notify("WARNING\nDS18 not detected", ip);
+    }
+    if(++nWarnCnt > 5)
+      nWarnCnt = 0;
     return;
   }
 
@@ -177,11 +186,14 @@ void WB::service() //  1 second
       uint32_t ct = fCnt;
       int16_t tDiff = m_hiTemp - newTemp;
       nHeatETA = ct * tDiff;
-      int16_t ti = hour() * 60 + minute() + (nHeatETA / 60);
 
-      int16_t tt = tempAtTime( ti ); // get real target temp
-      tDiff = tt - newTemp;
-
+      if(gLTime.tm_year > 124)
+      {
+        int16_t ti = gLTime.tm_hour * 60 + gLTime.tm_min + (nHeatETA / 60);
+  
+        int16_t tt = tempAtTime( ti ); // get real target temp
+        tDiff = tt - newTemp;
+      }
       if (tDiff < 0) tDiff = 0;
       nHeatETA = ct * tDiff;
       nHeatCnt = 0;
@@ -239,8 +251,11 @@ void WB::service() //  1 second
       onCounter++;
     else if (onCounter)
     {
-      ee.tSecsMon[month() - 1] += onCounter;
-      onCounter = 0;
+      if(gLTime.tm_year > 124)
+      {
+        ee.tSecsMon[gLTime.tm_mon - 1] += onCounter;
+        onCounter = 0;
+      }
     }
     if (m_bHeater == false && nOvershootCnt)
       nOvershootCnt++;
@@ -267,8 +282,11 @@ void WB::service() //  1 second
         ee.update( false );
       }
       bLastOn = m_bHeater;
-      ee.tSecsMon[month() - 1] += onCounter;
-      onCounter = 0;
+      if(gLTime.tm_year > 124)
+      {
+        ee.tSecsMon[gLTime.tm_mon - 1] += onCounter;
+        onCounter = 0;
+      }
     }
     if (m_bHeater)
       nHeatCnt++;
@@ -327,7 +345,7 @@ void WB::checkLimits()
 
 void WB::checkSched(bool bUpdate)
 {
-  long timeNow = (hour() * 60) + minute();
+  long timeNow = (gLTime.tm_hour * 60) + gLTime.tm_min;
 
   if (bUpdate)
   {
@@ -370,7 +388,7 @@ void WB::checkSched(bool bUpdate)
       range = ee.schedule[m_season][s2].timeSch - start;
     }
 
-    int m = (hour() * 60) + minute(); // current TOD in minutes
+    int m = (gLTime.tm_hour * 60) + gLTime.tm_min; // current TOD in minutes
 
     if (m < start) // offset by start of current schedule
       m -= start - (24 * 60); // rollover
@@ -440,19 +458,22 @@ int WB::tween(int t1, int t2, int m, int range)
 
 void WB::getSeason()
 {
-    tmElements_t tm;
-    breakTime(now(), tm);
-    tm.Month = 1; // set to first day of the year
-    tm.Day = 1;
-    time_t boy = makeTime(tm);
-    uint16_t doy = (now()- boy) / 60 / 60 / 24; // divide seconds into days
+  if(gLTime.tm_year < 124)
+    return;
 
-    if(doy < ee.scheduleDays[0] || doy > ee.scheduleDays[3]) // winter
-      m_season = 3;
-    else if(doy < ee.scheduleDays[1]) // spring
-      m_season = 0;
-    else if(doy < ee.scheduleDays[2]) // summer
-      m_season = 1;
-    else
-      m_season = 2;
+  tm timeinf;
+  memcpy((uint8_t*)&timeinf, (uint8_t*)&gLTime, sizeof(tm));
+  timeinf.tm_mon = 1; // set to first day of the year
+  timeinf.tm_mday = 1;
+  time_t boy = mktime(&timeinf);
+  uint16_t doy = (time(nullptr) - boy) / 60 / 60 / 24; // divide seconds into days
+
+  if(doy < ee.scheduleDays[0] || doy > ee.scheduleDays[3]) // winter
+    m_season = 3;
+  else if(doy < ee.scheduleDays[1]) // spring
+    m_season = 0;
+  else if(doy < ee.scheduleDays[2]) // summer
+    m_season = 1;
+  else
+    m_season = 2;
 }
