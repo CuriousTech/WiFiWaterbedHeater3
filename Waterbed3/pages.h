@@ -460,7 +460,7 @@ function draw_scale(ar,pp,w,h,o,p,ct)
   for(i=0;i<ar.length;i++)
   {
     x=i*(w/ar.length)+4+ctx.lineWidth
-    ctx.strokeStyle='#55F'
+    ctx.strokeStyle=(i==ct)?'#60F':'#55F'
     if(ar[i]){
         bh=ar[i]*(h-28)/max
         y=(o+h-20)-bh
@@ -472,16 +472,6 @@ function draw_scale(ar,pp,w,h,o,p,ct)
     ctx.strokeStyle="#FFF"
     ctx.fillText(i+p,x,o+h-7)
 
-    if(i==ct)
-    {
-      ctx.strokeStyle="#000"
-      ctx.lineWidth=1
-      ctx.beginPath()
-      ctx.moveTo(x+lw+1,o+h-2)
-      ctx.lineTo(x+lw+1,o+1)
-      ctx.stroke()
-      ctx.lineWidth=lw
-    }
     bh=+bh.toFixed()+5
     x=+x.toFixed()
     cost=+(ppkw*ar[i]*(watts/3600000)).toFixed(2)
@@ -614,7 +604,7 @@ function togglebit(n,bit)
 
 function testdraw(x,y,zone)
 {
-  try {
+ try {
   var c=document.getElementById('radar')
   ctx=c.getContext("2d")
   ctx.fillStyle=colors[zone]
@@ -623,7 +613,7 @@ function testdraw(x,y,zone)
   y = y/(bound/c.height)
   ctx.ellipse(x, y, ballrad-3, ballrad-3, 0, 0, Math.PI*2)
   ctx.fill()
-}catch(err){}
+ }catch(err){}
 }
 
 function draw_radar(xPos,yPos,pres,zone){
