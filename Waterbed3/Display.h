@@ -133,6 +133,7 @@ private:
   void btnRSSI(Button *pBtn, int16_t x, int16_t y);
   void drawNotifs(Tile& pTile, int16_t x, int16_t y);
   void drawText(String s, int16_t x, int16_t y, int16_t angle, uint16_t cFg, uint16_t cBg, const GFXfont *pFont );
+  uint8_t hourFormat12(uint8_t h);
 
 public:
   void formatButtons(Tile& pTile);
