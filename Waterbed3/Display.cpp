@@ -3,7 +3,7 @@ Display and UI code
 */
 
 #include <WiFi.h>
-#include <TimeLib.h>
+#include <time.h>
 #include "eeMem.h"
 #include "Lights.h"
 #include <FunctionalInterrupt.h>
@@ -25,6 +25,8 @@ extern void startWiFi();
 extern bool sendStatCmd( uint16_t *pCode);
 extern void consolePrint(String s); // for browser debug
 extern void remoteNotifCancelled(void);
+
+extern tm gLTime;
 
 static_assert(USER_SETUP_ID==303, "User setup incorrect in TFT_eSPI, use 303");
 
@@ -246,8 +248,8 @@ void Display::service(void)
     updateTile();
   }
 
-// WiFi connect effect
-  if( (year() < 2024 || WiFi.status() != WL_CONNECTED)) // Do a connecting effect
+  // WiFi connect effect
+  if( gLTime.tm_year < 124 || WiFi.status() != WL_CONNECTED) // Do a connecting effect
   {
     static uint8_t rgb[3] = {0, 0, 0};
     static uint8_t cnt;
@@ -730,6 +732,16 @@ void Display::drawTile(int8_t nTile, bool bFirst, int16_t x, int16_t y)
   }
 }
 
+uint8_t Display::hourFormat12(uint8_t h)
+{
+  if(h > 12) return h - 12;
+  if(h == 0) h = 12;
+  return h;
+}
+
+const char _monthShortStr[13][4] PROGMEM = {"","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+const char _dayShortStr[8][4] PROGMEM = {"","Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+
 void Display::drawButton(Tile& pTile, Button *pBtn, bool bPressed, int16_t x, int16_t y, bool bInit)
 {
   String s = pBtn->pszText;
@@ -740,30 +752,32 @@ void Display::drawButton(Tile& pTile, Button *pBtn, bool bPressed, int16_t x, in
       btnRSSI(pBtn, x, y);
       return;
     case BTF_Time:
-      if(year() < 2024) // don't display invalid time
+      if(gLTime.tm_year < 124) // don't display invalid time
         return;
-      s = String( hourFormat12() );
-      if(hourFormat12() < 10)
+      s = String( hourFormat12(gLTime.tm_hour) );
+      if(hourFormat12(gLTime.tm_hour) < 10)
         s = " " + s;
       s += ":";
-      if(minute() < 10) s += "0";
-      s += minute();
+      if(gLTime.tm_min < 10) s += "0";
+      s += gLTime.tm_min;
       break;
     case BTF_AMPM:
+      if(gLTime.tm_year < 124) // don't display invalid time
+        return;
       s = "";
-      if(second() < 10) s += "0";
-      s += second();
+      if(gLTime.tm_sec < 10) s += "0";
+      s += gLTime.tm_sec;
       s += " ";
-      s += isPM() ? "PM":"AM";
+      s += (gLTime.tm_hour >= 12) ? "PM":"AM";
       s += " ";
-      s += dayShortStr(weekday());
+      s += _dayShortStr[gLTime.tm_wday];
       break;
     case BTF_Date:
-      if(year() < 2024) // don't display invalid time
+      if(gLTime.tm_year < 124) // don't display invalid time
         return;
-      s = monthShortStr(month());
+      s = _monthShortStr[gLTime.tm_mon];
       s += " ";
-      s += String(day());
+      s += String(gLTime.tm_mday);
       break;
 
     case BTF_SetTemp:
@@ -809,8 +823,17 @@ void Display::drawButton(Tile& pTile, Button *pBtn, bool bPressed, int16_t x, in
       s = pBtn->pszText;
       s.remove(29); // cut down if needed
       break;
-
-   case BTF_Brightness:
+#ifdef RADAR_H
+    case BTF_RadarDist:
+      s = "Radar ";
+      s += radar.nZone;
+      s += " ";
+      s += radar.nDistance;
+      s += " ";
+      s += radar.nEnergy;
+      break;
+#endif
+    case BTF_Brightness:
       if(bInit) // only set when drawing tile, not user interaction
         pBtn->data[1] = m_brightness * 100 / 255;
       s = "Brightness ";
@@ -873,7 +896,6 @@ void Display::drawButton(Tile& pTile, Button *pBtn, bool bPressed, int16_t x, in
   else if(pBtn->nFunction == BTF_History)
   {
     ta.draw(x + pBtn->r.x + 1, yOffset + 1, pBtn->r.w - 2, pBtn->r.h - 2);
-//    sprite.drawSmoothRoundRect(x + pBtn->r.x, yOffset, 2, 2, pBtn->r.w, pBtn->r.h, radius, TFT_CYAN, bgColor);
     sprite.drawRoundRect(x + pBtn->r.x, yOffset, pBtn->r.w, pBtn->r.h, radius, TFT_CYAN);
   }
   else if(pBtn->pIcon[nState]) // draw an image if given
