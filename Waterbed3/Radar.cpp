@@ -3,7 +3,6 @@
 #include "Radar.h"
 #include "Display.h"
 #include "jsonString.h"
-#include <TimeLib.h>
 #include "Lights.h"
 #include "eeMem.h"
 
@@ -142,7 +141,7 @@ bool Radar::read()
     lastSent = millis();
 
     jsonString js("radar");
-    js.Var("t", (uint32_t)now());
+    js.Var("t", (uint32_t)time(nullptr) );
     js.Var("zone", nZone);
     js.Var("X", radTgt[0].x);
     js.Var("Y", radTgt[0].y);
