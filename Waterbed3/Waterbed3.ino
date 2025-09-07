@@ -29,9 +29,7 @@ SOFTWARE.
 //  In TFT_eSPI/User_Setup_Select.h use #include <User_Setups/Setup303_Waveshare_ESP32S3_ST7789.h> (custom, included in repo)
 
 #include <WiFi.h>
-#include <TimeLib.h> // https://github.com/PaulStoffregen/Time
-#include <UdpTime.h> // https://github.com/CuriousTech/ESP07_WiFiGarageDoor/tree/master/libraries/UdpTime
-
+#include <time.h>
 #include "eeMem.h"
 #include "WB.h"
 #include "TempArray.h"
@@ -58,11 +56,14 @@ int nWrongPass;
 TempArray ta;
 THSensor ths;
 Media media;
+tm gLTime;
+
+#define TZ  "EST5EDT,M3.2.0,M11.1.0"  // https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
 
 #include "display.h"
 #include "Lights.h" // Uses ~3KB
 
-#ifdef RADAR_H
+#ifdef RADAR_H // defined in WB.h
 Radar radar;
 #endif
 
@@ -73,11 +74,8 @@ bool bConfigDone = false; // EspTouch done or creds set
 bool bStarted = false; // first start
 bool bRestarted = false; // consecutive restarts
 
-uint32_t connectTimer;
-
 Display display;
 eeMem ee;
-UdpTime udpTime;
 WB wb;
 
 void consolePrint(String s)
@@ -101,7 +99,6 @@ bool secondsWiFi() // called once per second
     if( WiFi.smartConfigDone())
     {
       bConfigDone = true;
-      connectTimer = now();
     }
   }
   if(bConfigDone)
@@ -124,9 +121,8 @@ bool secondsWiFi() // called once per second
 // todo: reconnect to host
       }
     }
-    else if(now() - connectTimer > 10) // failed to connect for some reason
+    else if(WiFi.status() == WL_CONNECT_FAILED) // failed to connect for some reason
     {
-      connectTimer = now();
       WiFi.mode(WIFI_AP_STA);
       WiFi.beginSmartConfig();
       bConfigDone = false;
@@ -428,7 +424,6 @@ void startWiFi()
     WiFi.beginSmartConfig();
     display.Notify("Use EspTouch to configure\nWiFi connection", ip);
   }
-  connectTimer = now();
 
   ArduinoOTA.setHostname(hostName);
   ArduinoOTA.begin();
@@ -522,7 +517,7 @@ void serviceWiFi()
 String dataJson()
 {
   jsonString js("state");
-  js.Var("t", (long)now() - ( (ee.tz + udpTime.getDST() ) * 3600) );
+  js.Var("t", (long)time(nullptr) );
 
   js.Var("waterTemp", String((float)wb.m_currentTemp / 10, 1) );
   js.Var("setTemp", String((float)ee.schedule[wb.m_season][wb.m_schInd].setTemp / 10, 1) );
@@ -565,7 +560,6 @@ void sendState()
 String setupJson()
 {
   jsonString js("settings");
-  js.Var("tz", ee.tz);
   js.Var("st", ee.sleepTime);
   js.Var("vt", String((float)ee.vacaTemp / 10, 1) );
   js.Var("avg", ee.bAvg);
@@ -644,9 +638,7 @@ void setup()
 
 void loop()
 {
-  static uint8_t hour_save, min_save = 255, sec_save, mon_save;
-  static int8_t lastSec;
-  static int8_t lastHour;
+  static uint8_t hour_save, min_save = 255, mon_save = 255;
 
   display.service();  // check for touch, etc.
   media.service();
@@ -656,44 +648,53 @@ void loop()
   radar.service();
 #endif
 
-  if(WiFi.status() == WL_CONNECTED)
-    if(udpTime.check(ee.tz))
-    {
-    }
-
   serviceWiFi(); // handles OTA
 
-  if(sec_save != second()) // only do stuff once per second
-  {
-    sec_save = second();
+  static uint32_t lastMS;
 
+  if(millis() - lastMS > 1000) // only do stuff once per second
+  {
+    getLocalTime(&gLTime); // this is used globally
+    
+    lastMS = millis();
     if(secondsWiFi()) // once per second stuff, returns true once on connect
-      udpTime.start();
+    {
+      configTime(0, 0, "pool.ntp.org");
+      setenv("TZ", TZ, 1);
+      tzset();
+    }
 
     display.oneSec();
 
-    if(min_save != minute()) // only do stuff once per minute
+    if(gLTime.tm_year > 124)
     {
-      min_save = minute();
-      wb.checkSched(false);     // check every minute for next schedule
-
-      if(hour_save != hour()) // update our IP and time daily (at 2AM for DST)
+      if(min_save != gLTime.tm_min) // only do stuff once per minute
       {
-        hour_save = hour();
-        if(hour_save == 2 && WiFi.status() == WL_CONNECTED)
-          udpTime.start(); // update time daily at DST change
-
-        ee.update(false);
-
-        if ( mon_save != month() )
+        min_save = gLTime.tm_min;
+        wb.checkSched(false);     // check every minute for next schedule
+  
+        if(hour_save != gLTime.tm_hour) // update our IP and time daily (at 2AM for DST)
         {
-          if (mon_save >= 0 && year() > 2020) // restart check
-            ee.tSecsMon[month() - 1] = 0;
-          mon_save = month();
+          hour_save = gLTime.tm_hour;
+          if(hour_save == 2 && WiFi.status() == WL_CONNECTED)
+          {
+            configTime(0, 0, "pool.ntp.org");
+            setenv("TZ", TZ, 1);
+            tzset();
+          }
+  
+          ee.update(false);
+  
+          if ( mon_save != gLTime.tm_mon )
+          {
+            if (mon_save <= 12) // restart check
+              ee.tSecsMon[gLTime.tm_mon - 1] = 0;
+            mon_save = gLTime.tm_mon;
+          }
+          wb.getSeason();
         }
-        wb.getSeason();
-      }
 
+      }
       if( (min_save % 5) == 0)
         ta.add(); // 5 minute log
     }
