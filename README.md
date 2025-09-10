@@ -19,3 +19,6 @@ The web page. Same as previous, but allows drag and drop files over the lower fi
 ![Web](http://curioustech.net/images/wb3web.png)  
   
 Building: The ino explains the common settings for the IDE like my other projects. I use the Windows Store version because it works best for me. If a library is missing, the error should show a line with a link to where to get it. If not, complain.  
+  
+A little explanation of the HLK-LD2450 reader: The bottom area of the page represents the detection area. The 5000 (mm) is the X (signed X/2) and Y cutoff. Anything beyond that is zone 2 (outside the room). Zone 2 is also anything painted grey (this sees through walls). This area means lights/fan off. Zome 1 is in the room/lights on and fan off, motion or not. Latch area switches to zone 0/light off and fan on. Hold area is still in bed/zone 0 if latched.  
+  
