@@ -260,7 +260,7 @@ void Display::service(void)
         rgb[0] ++;
       else
         rgb[2] ++;
-      tft.drawSmoothRoundRect(0, 0, 13, 14, DISPLAY_WIDTH-1, DISPLAY_HEIGHT - 2, rgb16(rgb[0], rgb[1], rgb[2]), bgColor);
+      tft.drawSmoothRoundRect(0, 0, 13, 14, DISPLAY_WIDTH-2, DISPLAY_HEIGHT - 2, rgb16(rgb[0], rgb[1], rgb[2]), bgColor);
     }
   }
 }
