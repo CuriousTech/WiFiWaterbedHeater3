@@ -47,7 +47,8 @@ colors=['#F0F','#0F0','#FF0']
 function openSocket(){
 initradar()
 setclr(true)
-ws=new WebSocket("ws://"+window.location.host+"/ws")
+relPath = location.href.replace(/^https?:\/\/|[^/]*$/gi, "")
+ws = new WebSocket("ws://"+relPath+"ws")
 //ws=new WebSocket("ws://192.168.31.8/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
@@ -142,6 +143,13 @@ function setSeason(s)
   }
   a.inc.value=Math.min(8,cnt+1)
   a.dec.value=Math.max(1,cnt-1)
+}
+
+function relClick(ref)
+{
+  path = location.pathname//.replace(//]*$/, "")
+  console.log(path)
+  window.location=path+ref
 }
 
 function setVar(varName, value)
@@ -763,7 +771,7 @@ openSocket()
 <tr><td colspan=2 align="left">PPKWH $<input id='K' type=text size=2 value='0.1597' onchange="{setPPK()}">
  </td><td> <input id="myKey" name="key" type=text size=40 placeholder="password" style="width: 100px" onChange="{localStorage.setItem('key', key = document.all.myKey.value)}"></td></tr>
  <tr><td><input value='SET' id='bset' type='button' onclick="{setclr(true)}"><input value='CLR' id='bclr' type='button' onclick="{setclr(false)}"></td>
- <td><input value='ERASE' type='button' onclick="{erase()}"><input id='bound' type=text size=1 value='6000' onchange="{setbound(this.value)}"></td><td><input type="submit" value="File Manager" onClick="window.location='/fm.html';"></td>
+ <td><input value='ERASE' type='button' onclick="{erase()}"><input id='bound' type=text size=1 value='6000' onchange="{setbound(this.value)}"></td><td><input type="submit" value="File Manager" onClick="relClick('fm.html');"></td>
  </tr>
 <tr><td colspan=3><canvas id="radar" width="320" height="320" style="float:center"></td></tr>
 </table>
@@ -799,7 +807,8 @@ $(document).ready(function(){
 })
 
 function openSocket(){
- ws=new WebSocket("ws://"+window.location.host+"/ws")
+ relPath = location.href.replace(/^https?:\/\/|[^/]*$/gi, "")
+ ws = new WebSocket("ws://"+relPath+"ws")
 // ws=new WebSocket("ws://192.168.31.103/ws")
  ws.onopen=function(evt){}
  ws.onclose=function(evt){alert("Connection closed.");}
@@ -989,7 +998,9 @@ dropContainer.ondrop = function(evt) {
     it[2]=0
     formData = new FormData()
     formData.append(data.name,data,fullName(data.name))
-    fetch('/upload', {method: 'POST', body: formData})
+    m = location.href.match(/https?:\/\/[^/]+(\/[^/]+\/)/)
+    upload = (m && m[1] || "/") + "upload"
+    fetch(upload, {method: 'POST', body: formData})
     AddFile(it)
    }
   }
@@ -1101,4 +1112,3 @@ const uint8_t delbtn_png[] PROGMEM = {
   0x9E,0x2D,0x85,0xFC,0x94,0x69,0xDB,0x6F,0xF4,0x6C,0xF9,0x07,0x37,0xB8,0x4A,0x73,
   0x18,0x72,0xA3,0x13,0x00,0x00,0x00,0x00,0x49,0x45,0x4E,0x44,0xAE,0x42,0x60,0x82,
 };
-
