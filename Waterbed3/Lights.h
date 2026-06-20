@@ -17,6 +17,7 @@ enum LI_Status
 
 struct cQ
 {
+  String sName;
   IPAddress ip;
   String sUri;
   uint16_t port;
@@ -34,18 +35,22 @@ public:
   bool getSwitch(const char *pName);
   int checkStatus();
   void clearQueue(void);
+  void callQueue(String sName, uint16_t port, String sUri);
+  void callQueue(IPAddress ip, uint16_t port, String sUri);
 
 private:
-  bool send(IPAddress serverIP, uint16_t port, const char *pURI);
+  bool send(String sName, uint16_t port, const char *pURI);
+  bool send(IPAddress ip, uint16_t port, const char *pURI);
   void _onConnect(AsyncClient* client);
   void _onDisconnect(AsyncClient* client);
+  void _onTimeout(AsyncClient* client, uint32_t time);
   void _onData(AsyncClient* client, char* data, size_t len);
   void processJson(char *p, const char **jsonList);
   char *skipwhite(char *p);
   void callback(int8_t iName, char *pName, int32_t iValue, char *psValue);
   void checkQueue(void);
-  void callQueue(IPAddress ip, uint16_t port, String sUri);
-
+  int16_t outTemp();
+  int16_t outRh();
   AsyncClient m_ac;
   char *m_pBuffer = NULL;
   char *m_pURI;
@@ -55,11 +60,14 @@ private:
   int m_bufIdx;
   bool m_bOn[EE_LIGHT_CNT][2];
   uint16_t m_nLevel[EE_LIGHT_CNT];
-
+  uint8_t _error;
 #define CQ_CNT 16
   cQ queue[CQ_CNT];
   uint8_t qIdxIn;
   uint8_t qIdxOut;
+
+  int16_t m_outTemp;
+  int16_t m_outRh;
 };
 
 extern Lights lights;
