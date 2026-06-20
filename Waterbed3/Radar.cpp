@@ -22,22 +22,6 @@ void Radar::init()
   RADAR_SERIAL.begin(256000, SERIAL_8N1);
 
   delay(10);
-
-#ifdef LD2450
-
-#else
-  if(m_ld.begin(RADAR_SERIAL))
-  {
-    if(!m_ld.requestCurrentConfiguration())
-    {
-//      ets_printf("requestConfig failed\r\n");
-    }
-    else
-      radarConnected = true;
-  }
-//  else
-//    ets_printf("radar.init failed\r\n");
-#endif
 }
 
 void Radar::service()
@@ -82,7 +66,7 @@ bool Radar::read()
     buffer_head = (buffer_head + 1) % LD2450_BUFFER_SIZE;
 
     if (buffer_head == buffer_tail) {
-        buffer_tail = (buffer_tail + 1) % LD2410_BUFFER_SIZE;
+        buffer_tail = (buffer_tail + 1) % LD2450_BUFFER_SIZE;
     }
 
     new_data = true;
@@ -115,11 +99,11 @@ bool Radar::read()
         if (radTgt[i].speed & 0x8000)
           radTgt[i].speed = -(radTgt[i].speed & 0x7FFF);
       }
-      buffer_tail = (buffer_tail + 26) % LD2410_BUFFER_SIZE; // may skip one, don't care
+      buffer_tail = (buffer_tail + 26) % LD2450_BUFFER_SIZE; // may skip one, don't care
       break;
     }
     else
-      buffer_tail = (buffer_tail + 1) % LD2410_BUFFER_SIZE;
+      buffer_tail = (buffer_tail + 1) % LD2450_BUFFER_SIZE;
   }
 
   bool bRes = false;
@@ -136,7 +120,7 @@ bool Radar::read()
   }
 
   static uint32_t lastSent = 0;
-  if( millis() - lastSent > 250) // 4 Hz
+  if( millis() - lastSent > 1000) // 4 Hz
   {
     lastSent = millis();
 
@@ -195,7 +179,7 @@ bool Radar::read()
   if(nZoneCnt < 200)
     nZoneCnt++;
 
-  if(nZoneCnt < 8) // 8 may feel too fast, 16 is about 1 second
+  if(nZoneCnt < 16) // 8 may feel too fast, 16 is about 1 second
   {
     return bPresence;
   }
@@ -260,155 +244,4 @@ bool Radar::blindCheck(int32_t x, int32_t y)
   return !(ee.blindBits[y] & (1 << x));
 }
 
-#else // LD2410
-bool Radar::read()
-{
-  const uint16_t nOutofBedThreshold = 200; // ~200cm from headboard to foot
-  const uint16_t nInBedThreshold = 32;
-
-  static uint8_t nNewZone;
-  static uint8_t nZoneCnt;
-
-  static uint32_t lastReading = 0;
-
-  static bool bPresence;
-
-  static uint16_t rads[16];
-
-  m_ld.read();
-  if(!m_ld.isConnected() || millis() - lastReading < (150*3) ) // About the same as the radar / 3 - radar is 150ms
-    return bPresence;
-
-  lastReading = millis();
-
-  bits = m_ld.presenceDetected() | (m_ld.stationaryTargetDetected()<<1) | (m_ld.movingTargetDetected()<<2);
-
- /*
-  static uint32_t lastSent = 0;
-  if( millis() - lastSent > 499) // 2 Hz
-  {
-    lastSent = millis();
-
-    jsonString js("radar");
-    js.Var("t", (uint32_t)now());
-    js.Var("zone", nZone);
-    js.Var("bits", m_ld.presenceDetected() | (nZone<<1) | (m_bInBed<<3) | m_ld.stationaryTargetDetected()<<4 | m_ld.movingTargetDetected()<<5);
-    js.Var("dist", m_ld.stationaryTargetDistance() );
-    js.Var("distM", m_ld.movingTargetDistance());
-    js.Var("en", m_ld.stationaryTargetEnergy());
-    js.Var("enM", m_ld.movingTargetEnergy());
-    WsSend(js.Close());
-  }
-*/
-
-  nDistance = m_ld.stationaryTargetDistance();
-  nEnergy = m_ld.stationaryTargetEnergy();
-
-  if(m_ld.movingTargetDetected())
-  {
-    nDistance = m_ld.movingTargetDistance();
-    nEnergy = m_ld.movingTargetEnergy();
-  }
-
-  for(uint8_t i = 0; i < 15; i++) // fifo for debug
-    rads[i] = rads[i+1];
-  rads[15] = nDistance;
-
-  if(nDistance < nInBedThreshold)
-  {
-    if(nNewZone != 0)
-      nZoneCnt = 0;
-    nNewZone = 0;
-    bPresence = true;
-  }
-  else if( (nDistance > nOutofBedThreshold - 30 || nDistance == 30) && (nEnergy < 10 || m_ld.presenceDetected() == false )) // out of bed/room no energy
-  {
-    if(nNewZone != 2)
-    {
-      nZoneCnt = 0;
-    }
-    nNewZone = 2;
-  }
-  else if(nDistance > nOutofBedThreshold)
-  {
-    if(nNewZone != 1)
-      nZoneCnt = 0;
-    nNewZone = 1;
-  }
-
-  if(nNewZone == nZone) // no change
-    return bPresence;
-
- // give it time to settle
-  if(nZoneCnt < 200)
-    nZoneCnt++;
-  if(nZoneCnt < 8)
-  {
-    if(nZone == 0 && nNewZone == 1 && nDistance < nOutofBedThreshold) // jump rejection
-    {
-      nZoneCnt = 0;
-      nNewZone = 0;
-    }
-    return bPresence;
-  }
-
-  if(nZone == 1 && bits == 0 && nEnergy < 10) // energy dropped while our of bed
-  {
-     nNewZone = 2;
-  }
-  else if(nZone == 2 && nEnergy > 30) // entering room
-  {
-     nNewZone = 1;
-  }
-
-  nZone = nNewZone;
-
-  switch(nZone)
-  {
-    case 0: // in bed
-      bPresence = true;
-      m_bInBed = true;
-      if(m_bLightOn)
-      {
-        lights.clearQueue();
-        lights.setSwitch("Dresser", 0, 0);
-        lights.setSwitch("Headboard", 0, 0);
-        lights.setSwitch("BRFan", 1, 0);
-        m_bLightOn = false;
-      }
-      break;
-    case 1: // in room, out of bed
-      bPresence = true;
-      m_bInBed = false;
-      if(m_bLightOn == false)
-      {
-        display.m_backlightTimer = ee.sleepTime; // got up
-        display.m_brightness = ee.brightLevel;
-        lights.clearQueue();
-        lights.setSwitch("Dresser", 1, 0);
-        lights.setSwitch("Headboard", 1, 0);
-        lights.setSwitch("BRFan", 0, 0);
-        m_bLightOn = true;
-      }
-      break;
-    case 2: // out of room
-      bPresence = false;
-      m_bInBed = false;
-      if(m_bLightOn)
-      {
-        lights.clearQueue();
-        lights.setSwitch("Dresser", 0, 0);
-        lights.setSwitch("Headboard", 0, 0);
-        lights.setSwitch("BRFan", 0, 0);
-        m_bLightOn = false;
-      }
-      break;
-  }
-
-  if(m_bLightOn)
-    display.m_backlightTimer = ee.sleepTime; // keep display on with lights
-
-  return bPresence;
-}
-
-#endif // LD2410
+#endif // LD2450
