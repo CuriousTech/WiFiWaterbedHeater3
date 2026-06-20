@@ -14,7 +14,7 @@ extern void consolePrint(String s);
 
 void TempArray::add()
 {
-  if(!gLTime.tm_year < 124)
+  if(gLTime.tm_year < 124)
     return;
 
   int iPos = gLTime.tm_hour * 12 + gLTime.tm_min / 5;
