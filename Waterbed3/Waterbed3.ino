@@ -22,7 +22,7 @@ SOFTWARE.
 */
 
 // Build with Arduino IDE 1.8.57.0
-//  ESP32: (2.0.14) ESP32S3 Dev Module, QIO, CPU Freq: 240MHz for mp3 playback
+//  ESP32: (2.0.14, NOT 2.0.17) ESP32S3 Dev Module, QIO, CPU Freq: 240MHz for mp3 playback
 //  Flash: 16MB
 //  Partition: 8M with SPIFFS or 16 MB with FatFS (change INTERNAL_FS in Media.h to match)
 //  PSRAM: OPI PSRAM
@@ -62,7 +62,7 @@ tm gLTime;
 
 #include "display.h"
 #include "Lights.h" // Uses ~3KB
-
+ 
 #ifdef RADAR_H // defined in WB.h
 Radar radar;
 #endif
@@ -118,8 +118,16 @@ bool secondsWiFi() // called once per second
       if(!bRestarted) // wakeup work if needed
       {
         bRestarted = true;
-// todo: reconnect to host
       }
+    }
+    else if(WiFi.status() == WL_DISCONNECTED) // connection dropped
+    {
+        static uint8_t nDelay = 5;
+        if(--nDelay == 0)
+        {
+          WiFi.begin(ee.szSSID, ee.szSSIDPassword);
+          nDelay = 5;
+        }
     }
     else if(WiFi.status() == WL_CONNECT_FAILED) // failed to connect for some reason
     {
@@ -229,9 +237,9 @@ void jsonCallback(int16_t iName, int iValue, char *psValue)
       break;
     case 7: // vacatemp
       if (ee.bCF)
-        ee.vacaTemp = constrain( (int)(atof(psValue) * 10), 100, 290); // 10-29C
+        ee.vacaTemp = constrain( (int)(atof(psValue) * 10), 70, 270); // 7-27C
       else
-        ee.vacaTemp = constrain( (int)(atof(psValue) * 10), 600, 840); // 60-84F
+        ee.vacaTemp = constrain( (int)(atof(psValue) * 10), 450, 800); // 45-80F
       break;
     case 8: // I
       item = iValue;
@@ -442,11 +450,7 @@ void startWiFi()
     ws.onEvent(onWsEvent);
     server.addHandler(&ws);
 
-    server.on ( "/", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
-      request->send_P( 200, "text/html", "Nope");
-    });
-
-    server.on ( "/iot", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest * request)
+    server.on ( "/", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest * request)
     {
       parseParams(request);
       if(INTERNAL_FS.exists("/index.html")) // override the hard coded page
@@ -470,7 +474,7 @@ void startWiFi()
       if(!index)
         request->_tempFile = media.createFile(filename);
       if(len)
-       request->_tempFile.write((byte*)data, len);
+       request->_tempFile.write(data, len);
       if(final)
         request->_tempFile.close();
      }
@@ -479,6 +483,7 @@ void startWiFi()
     server.on ( "/s", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest * request)
     {
       parseParams(request); // no repsonse, just take params
+      request->send(200, "text/plain", "OK");
     });
 
     server.onNotFound([](AsyncWebServerRequest * request) { // make it quiet to the outside world
@@ -625,6 +630,7 @@ void setup()
 //  delay(1000);
 //  ets_printf("\nStarting\n"); // print over USB (sets baud rate to 115200, radar needs 256K)
 
+  media.init(); // Starts FS for ee
   ee.init();  // Load EE
   display.init(); // start display
   wb.init(); // start WB
@@ -633,7 +639,6 @@ void setup()
 #ifdef RADAR_H
   radar.init();
 #endif
-  media.init();
 }
 
 void loop()
@@ -682,7 +687,7 @@ void loop()
             setenv("TZ", TZ, 1);
             tzset();
           }
-  
+
           ee.update(false);
   
           if ( mon_save != gLTime.tm_mon )
@@ -693,8 +698,10 @@ void loop()
           }
           wb.getSeason();
         }
-
       }
+      IPAddress ip(ee.hvacIP);
+      lights.callQueue(ip, 80, "/s");
+
       if( (min_save % 5) == 0)
         ta.add(); // 5 minute log
     }
