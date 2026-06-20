@@ -23,17 +23,17 @@ void THSensor::service()
   if(--read_delay)
     return;
 
-  float temp;
-  float rh;
+  int16_t temp;
+  int16_t rh;
   if(am.measure(temp, rh))
   {
     if(!ee.bCF)
-      temp = temp * 9 / 5 + 32;
-    tempMedian.add(temp * 10);
-    if (tempMedian.getAverage(2, temp) == tempMedian.OK)
+      temp = temp * 9 / 5 + 320;
+    tempMedian.add(temp);
+    if (tempMedian.getMedian(temp) == tempMedian.OK)
     {
       m_temp = temp;
-      m_rh = rh * 10;
+      m_rh = rh;
     }
     errCnt = 0;
   }
