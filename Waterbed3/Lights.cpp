@@ -15,7 +15,7 @@ Lights::Lights()
   m_ac.onConnect([](void* obj, AsyncClient* c) { (static_cast<Lights*>(obj))->_onConnect(c); }, this);
   m_ac.onDisconnect([](void* obj, AsyncClient* c) { (static_cast<Lights*>(obj))->_onDisconnect(c); }, this);
   m_ac.onData([](void* obj, AsyncClient* c, void* data, size_t len) { (static_cast<Lights*>(obj))->_onData(c, static_cast<char*>(data), len); }, this);
-  m_ac.setRxTimeout(3); // give it 3 seconds
+  m_ac.onTimeout([](void* obj, AsyncClient* c, uint32_t time) { (static_cast<Lights*>(obj))->_onTimeout(c, time); }, this);
 }
 
 void Lights::init()
@@ -40,13 +40,10 @@ void Lights::checkQueue()
 
   if(m_status == LI_Busy)
     return;
-
-  if ( send(queue[qIdxOut].ip, queue[qIdxOut].port, queue[qIdxOut].sUri.c_str()) )
-  {
-    queue[qIdxOut].port = 0;
-    if (++qIdxOut >= CQ_CNT)
-      qIdxOut = 0;
-  }
+  if(queue[qIdxOut].ip != 0)
+    send(queue[qIdxOut].ip, queue[qIdxOut].port, queue[qIdxOut].sUri.c_str());
+  else
+    send(queue[qIdxOut].sName, queue[qIdxOut].port, queue[qIdxOut].sUri.c_str());
 }
 
 void Lights::clearQueue()
@@ -56,10 +53,25 @@ void Lights::clearQueue()
   qIdxOut = 0;
 }
 
+void Lights::callQueue(String sName, uint16_t port, String sUri )
+{
+  if (queue[qIdxIn].port == 0)
+  {
+    memset(&queue[qIdxIn], 0, sizeof(cQ));
+    queue[qIdxIn].sName = sName;
+    queue[qIdxIn].sUri = sUri;
+    queue[qIdxIn].port = port;
+  }
+
+  if (++qIdxIn >= CQ_CNT)
+    qIdxIn = 0;
+}
+
 void Lights::callQueue(IPAddress ip, uint16_t port, String sUri )
 {
   if (queue[qIdxIn].port == 0)
   {
+    queue[qIdxIn].sName = "";
     queue[qIdxIn].ip = ip;
     queue[qIdxIn].sUri = sUri;
     queue[qIdxIn].port = port;
@@ -71,20 +83,21 @@ void Lights::callQueue(IPAddress ip, uint16_t port, String sUri )
 
 void Lights::setSwitch(char *pName, int8_t bPwr, uint16_t nLevel)
 {
-  uint8_t nLight = m_nSwitch; // last if no name
+  static String sName; // last if no name
 
   if(pName)
+    sName = pName;
+
+  uint8_t nLight;
+  if(sName)
     for(nLight = 0; ee.lights[nLight].szName[0] && nLight < EE_LIGHT_CNT; nLight++)
-      if(!strcmp((const char *)pName, (const char *)ee.lights[nLight].szName))
+      if(sName == ee.lights[nLight].szName)
         break;
 
-  if(nLight >= EE_LIGHT_CNT-1 || ee.lights[nLight].ip[0] == 0) // no IP
+  if(nLight >= EE_LIGHT_CNT-1)
     return;
-  
-  m_bQuery = false;
 
-  m_nSwitch = nLight; // for response
-  IPAddress ip(ee.lights[nLight].ip);
+  m_bQuery = false;
 
   uriString uri("/wifi");
   uri.Param("key", ee.iotPassword);
@@ -97,25 +110,30 @@ void Lights::setSwitch(char *pName, int8_t bPwr, uint16_t nLevel)
   {
     uri.Param("level0", nLevel * 10); // dimmers are 1-1000
   }
+  IPAddress ip = ee.lights[nLight].ip;
   callQueue(ip, 80, uri.string());
 }
 
 bool Lights::getSwitch(const char *pName)
 {
-  uint8_t nLight = m_nSwitch; // last if no name
+  static String sName; // last if no name
 
   if(pName)
+    sName = pName;
+
+  uint8_t nLight = 0;
+  if(sName)
     for(nLight = 0; ee.lights[nLight].szName[0] && nLight < EE_LIGHT_CNT; nLight++)
-      if(!strcmp(pName, (const char *)ee.lights[nLight].szName))
+      if(sName == ee.lights[nLight].szName)
         break;
 
-  if(nLight >= EE_LIGHT_CNT-1 || ee.lights[nLight].ip[0] == 0) // no IP
+  if(nLight >= EE_LIGHT_CNT-1)
     return false;
 
   return m_bOn[nLight][0];
 }
 
-bool Lights::send(IPAddress serverIP, uint16_t port, const char *pURI)
+bool Lights::send(String sName, uint16_t port, const char *pURI)
 {
   if(m_ac.connected() || m_ac.connecting())
     return false;
@@ -133,9 +151,40 @@ bool Lights::send(IPAddress serverIP, uint16_t port, const char *pURI)
   m_status = LI_Busy;
   strcpy(m_pBuffer, pURI);
 
-  if(!m_ac.connect(serverIP, port))
+  sName.toLowerCase();
+  sName += ".local";
+
+  if(!m_ac.connect(sName.c_str(), port))
   {
     m_status = LI_ConnectError;
+    _error = 2;
+    return false;
+  }
+  return true;
+}
+
+bool Lights::send(IPAddress ip, uint16_t port, const char *pURI)
+{
+  if(m_ac.connected() || m_ac.connecting())
+    return false;
+
+  if(m_pBuffer == NULL)
+  {
+    m_pBuffer = new char[LBUF_SIZE];
+    if(m_pBuffer) m_pBuffer[0] = 0;
+    else
+    {
+      m_status = LI_MemoryError;
+      return false;
+    }
+  }
+  m_status = LI_Busy;
+  strcpy(m_pBuffer, pURI);
+
+  if(!m_ac.connect(ip, port))
+  {
+    m_status = LI_ConnectError;
+    _error = 2;
     return false;
   }
   return true;
@@ -179,51 +228,76 @@ void Lights::_onData(AsyncClient* client, char* data, size_t len)
   m_pBuffer[m_bufIdx] = 0;
 }
 
+void Lights::_onTimeout(AsyncClient* client, uint32_t time)
+{
+  (void)client;
+
+  _error = 1;
+  m_status = LI_ConnectError;
+}
+
 void Lights::_onDisconnect(AsyncClient* client)
 {
   (void)client;
 
   char *p = m_pBuffer;
   m_status = LI_Done;
-  if(p == NULL)
-    return;
-  if(m_bufIdx == 0)
+  if(p)
   {
+    if(m_bufIdx == 0)
+    {
+      delete m_pBuffer;
+      m_pBuffer = NULL;
+      if(!_error)
+      {
+        queue[qIdxOut].port = 0;
+        if (++qIdxOut >= CQ_CNT)
+          qIdxOut = 0;
+      }
+      return;
+    }
+  
+    const char *jsonList[] = { // switch control mode
+      "name",
+      "ch",
+      "state",
+      "level0",
+      "outtemp",
+      "outrh",
+      NULL
+    };
+  
+    const char *jsonQ[] = { // query mode
+      "*",     // 0
+      NULL
+    };
+  
+    if(p[0] != '{')
+      while(p[4]) // skip all the header lines
+      {
+        if(p[0] == '\r' && p[1] == '\n' && p[2] == '\r' && p[3] == '\n')
+        {
+          p += 4;
+          break;
+        }
+        p++;
+      }
+  
+    if(m_bQuery)
+      processJson(p, jsonQ);
+    else
+      processJson(p, jsonList);
     delete m_pBuffer;
     m_pBuffer = NULL;
-    return;
   }
 
-  const char *jsonList[] = { // switch control mode
-    "ch",
-    "on0",
-    "on1",
-    "level0",
-    NULL
-  };
-
-  const char *jsonQ[] = { // query mode
-    "*",     // 0
-    NULL
-  };
-
-  if(p[0] != '{')
-    while(p[4]) // skip all the header lines
-    {
-      if(p[0] == '\r' && p[1] == '\n' && p[2] == '\r' && p[3] == '\n')
-      {
-        p += 4;
-        break;
-      }
-      p++;
-    }
-
-  if(m_bQuery)
-    processJson(p, jsonQ);
-  else
-    processJson(p, jsonList);
-  delete m_pBuffer;
-  m_pBuffer = NULL;
+  if(!_error)
+  {
+    queue[qIdxOut].port = 0;
+    if (++qIdxOut >= CQ_CNT)
+      qIdxOut = 0;
+  }
+  _error = 0;
 }
 
 void Lights::callback(int8_t iName, char *pName, int32_t iValue, char *psValue)
@@ -259,22 +333,38 @@ void Lights::callback(int8_t iName, char *pName, int32_t iValue, char *psValue)
         ee.lights[nIdx].ip[3] = ip[3];
 
         while(*pEnd && *pEnd != ',') pEnd++; // skip channel count
-        m_bOn[nIdx][0] = atoi(pEnd); // channel 0 state
+        m_bOn[nIdx][0] = atoi(pEnd) & 1; // channel 0 state
       }
       break;
-    case 0: // ch
+    case 0: // name
       break;
-    case 1: // on0
-      m_bOn[m_nSwitch][0] = iValue;
+    case 1: // ch
       break;
-    case 2: // on1
-      m_bOn[m_nSwitch][1] = iValue;
+    case 2: // state
+      m_bOn[m_nSwitch][0] = (iValue&1) ? true:false;
+      m_bOn[m_nSwitch][1] = (iValue&2) ? true:false;
       break;
     case 3: // level0
       m_nLevel[m_nSwitch] = iValue;
       display.setSliderValue(BTF_LightsDimmer, m_nLevel[m_nSwitch] / 10 ); // dimmer is 1-1000, slider is 0-100
       break;
+    case 4:
+      m_outTemp = iValue;
+      break;
+    case 5:
+      m_outRh = iValue;
+      break;
   }
+}
+
+int16_t Lights::outTemp()
+{
+  return m_outTemp;  
+}
+
+int16_t Lights::outRh()
+{
+  return m_outRh;
 }
 
 void Lights::processJson(char *p, const char **jsonList)
@@ -362,7 +452,6 @@ void Lights::processJson(char *p, const char **jsonList)
         }
       }
     }
-
   }
 }
 
