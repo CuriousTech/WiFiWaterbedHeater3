@@ -3,9 +3,11 @@
 class uriString
 {
 public:
-  uriString(const char *pPath = NULL)
+  uriString(const char *pPath = NULL, uint16_t preAlloc = 1024)
   {
     m_cnt = 0;
+    s = String("");
+    s.reserve(preAlloc);
     s = pPath;
   }
         
